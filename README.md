@@ -8,7 +8,7 @@ wall. Single-player/offline only.
 routing, input blocking and conflicts are the hub's (`mods/RestraintHub/README.md`). Refused while another restraint holds her
 neck, arms or legs (the yoke, the spreader bar, the game's handcuffs).
 
-**Status 1.2.0:** usable. Face a flat wall (within `Reach`), pick **Wall Restraint** in the common ring (hold 1; the restraint page
+**Status 1.3.0:** usable. Face a flat wall (within `Reach`), pick **Wall Restraint** in the common ring (hold 1; the restraint page
 after the game's, page 5) or put it on a number key; hold **F** to struggle free (`Unlock.SuccessChance`, default: the first
 attempt). Refusals are shown in the game's message bar ("Can't use the wall restraint here: ..."). Being restrained is not saved:
 a load starts free. While restrained, walking, running, crouching, peeing, pose skills and everything that needs her hands
@@ -28,7 +28,7 @@ and fences work now: a 1.64 m concrete fence takes her with the knees at 0.8 m.
   ring, back rest, arm rings, tube mouths). Format: `Logic/WallModel.cs`.
 - **Her body** is measured from the bones at lock time (sizes differ per save: the first save's character is ~1.5 m, the "Amateur"
   save's much smaller). `Logic/WallPose.cs` lays out the pose from the knees up and scales each restraint to its limb
-  (radii estimated from bone lengths for now).
+  (radii estimated from bone lengths: neck 7 % of the spine, upper arm 7.5 %, knee 15 % of the thigh; + `Model.ClearanceCm`).
 - **The wall:** a ray finds the collider in front of her, then `DepthProbe` renders the patch the restraints cover with Unity's
   depth shader (her renderers switched off for it) and `Logic/WallSpot.cs` fits a plane: refused when anything is missing (invisible
   `PlayerBlocker` walls), bumpy (> 1.5 cm) or turned; the restraints snap to the drawn surface (colliders can be up to 18 cm off,
@@ -49,6 +49,7 @@ and fences work now: a 1.64 m concrete fence takes her with the knees at 0.8 m.
 | Pose.KneeOutside | 1.3 | knee joint outside the leg tube's mouth, in knee radii |
 | Pose.TubeLift | 0.35 | leg tubes above the shin bones, in knee radii (the calf is above the bone when the shins are level) |
 | Model.TubeClearanceCm | 1 | room between leg and leg tube (cm) |
+| Model.ClearanceCm | 0.4 | room between neck / upper arms and collar / arm cuffs (cm; -1 .. 5, applied at the next lock) |
 | Pose.ThighLean | 20 | thighs lean out of the wall (degrees) |
 | Pose.ArchBulge | 0.04 | how far the rest pushes her chest out (m) |
 | Model.MetalShade | 0.3 | brightness of the metal parts |
@@ -92,12 +93,17 @@ and fences work now: a 1.64 m concrete fence takes her with the knees at 0.8 m.
   bar's key refused ("holds her legs"); `-` at the lowest height -> "The wall is not flat enough lower down", `+` -> "height: knees
   at 0.576 m"; F freed her. Details: `mods/RestraintHub/README.md`.
 
+- L3 1.3.0 tighter collar and arm cuffs (2026-10-24, first save, Residence house wall; the Yoke showed the 12 % neck estimate ~2 cm
+  too big): before, the inset showed the collar as a wide plate around the neck base and the arm tubes about twice her arms' width.
+  Neck 7 % of the spine + 0.4 cm: the collar sits around the neck, the choker just above it (front and three-quarter view). Arms
+  9 % still about twice her arm, 7.5 %: the cuffs close around the upper arms, nothing through them. Lock accepted as before.
+
 ## Ring and lock code
 The ring entry, number shortcuts and the + / - and F routing are RestraintHub's (1.2.0); UI helpers (`SfmKit.Game.GameUi`) and the
 lock rules (`SfmKit.Pure.LockMachine`) are shared in `src/SfmKit`.
 
 ## Known limits / next
-- Limb radii are estimates (12-15 % of bone lengths). Measuring them from a bake while she stands failed (other leg, torso and hair
+- Limb radii are estimates (7-15 % of bone lengths; the neck's ratio checked against the Yoke's neck ring on the same body). Measuring them from a bake while she stands failed (other leg, torso and hair
   in the cuts); measuring in the held pose (limbs apart) is the next try - `SfmKit.Pure.LimbGirth` is ready for it.
 - Through glass walls the shins and feet behind the wall are visible (nothing hides them).
 - The body inset (`BodyCamera`) draws only her, so the shins and feet inside the wall show there.

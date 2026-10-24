@@ -16,13 +16,13 @@ namespace WallRestraint
     {
         public const string PluginGuid = "com.local.wallrestraint";
         public const string PluginName = "WallRestraint";
-        public const string PluginVersion = "1.2.0";
+        public const string PluginVersion = "1.3.0";
         private const string ModelResource = "WallRestraint.assets.wallrestraint.wrm";
 
         internal static ManualLogSource Logger;
         /// <summary>The wall restraint's registration with RestraintHub (ring entry, selection, F and + / -).</summary>
         internal static Restraint Entry;
-        public static ConfigEntry<float> Reach, MetalShade, KneeHeight, StepCm, ThighLean, ArchBulge, TubeClearanceCm, KneeOutside, TubeLift;
+        public static ConfigEntry<float> Reach, MetalShade, KneeHeight, StepCm, ThighLean, ArchBulge, TubeClearanceCm, ClearanceCm, KneeOutside, TubeLift;
         public static ConfigEntry<int> DebugDisable;
         public static ConfigEntry<string> RingLabel;
         public static ConfigEntry<float> AttemptSeconds, SuccessChance;
@@ -58,6 +58,10 @@ namespace WallRestraint
             TubeClearanceCm = Config.Bind("Model", "TubeClearanceCm", 1f, new ConfigDescription(
                 "Room between her leg and the leg tubes (cm). Raise it if the legs show through the tubes (they are sized from an " +
                 "estimate of her knee, the calf can be thicker).", new AcceptableValueRange<float>(0f, 5f)));
+            ClearanceCm = Config.Bind("Model", "ClearanceCm", 0.4f, new ConfigDescription(
+                "Room between her neck / upper arms and the collar / arm cuffs (cm); both limbs are estimated from her bone lengths. " +
+                "Raise it if they show through, lower it (down to -1) for a tighter fit. Applies the next time she is put on the wall.",
+                new AcceptableValueRange<float>(-1f, 5f)));
             MetalShade = Config.Bind("Model", "MetalShade", 0.3f, new ConfigDescription(
                 "Brightness of the metal parts (0 = black, 1 = white).", new AcceptableValueRange<float>(0f, 1f)));
 

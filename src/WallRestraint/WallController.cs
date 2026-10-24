@@ -384,6 +384,7 @@ namespace WallRestraint
             var p = PoseParams.Default;
             p.ThighLean = Plugin.ThighLean.Value * Mathf.Deg2Rad;
             p.TubeClearance = Plugin.TubeClearanceCm.Value / 100f;
+            p.Clearance = Plugin.ClearanceCm.Value / 100f;
             p.KneeOutside = Plugin.KneeOutside.Value;
             p.TubeLift = Plugin.TubeLift.Value;
             return p;

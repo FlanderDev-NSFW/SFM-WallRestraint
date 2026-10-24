@@ -43,8 +43,10 @@ namespace WallRestraint
             b.Forearm = (D(laL, hdL) + D(laR, hdR)) / 2f;
             // Estimates until the limbs are measured from the mesh (ratios of the 1.5 m character of the first save).
             b.BackDepth = 0.22f * b.Spine;
-            b.NeckRadius = 0.12f * b.Spine;
-            b.ArmRadius = 0.12f * b.UpperArm;
+            // Neck 7 % of the spine (2.9 cm on the first save): 12 % left the collar 2 cm off her neck; screenshots of the Yoke's neck
+            // ring put the neck at about 2.7 cm [observed 2026-10-24]. Upper arm near the elbow 7.5 % (12 % was as loose; 9 % still twice her arm).
+            b.NeckRadius = 0.07f * b.Spine;
+            b.ArmRadius = 0.075f * b.UpperArm;
             b.KneeRadius = 0.15f * b.Thigh;
             if (b.Spine < 0.05f || b.Thigh < 0.05f || b.Shin < 0.05f || b.UpperArm < 0.05f)
             {
