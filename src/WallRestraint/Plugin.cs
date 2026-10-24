@@ -5,19 +5,23 @@ using BepInEx.Configuration;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
 using Il2CppInterop.Runtime.Injection;
+using RestraintHub;
 using WallRestraint.Logic;
 
 namespace WallRestraint
 {
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
+    [BepInDependency(Hub.Guid, BepInDependency.DependencyFlags.HardDependency)]
     public sealed class Plugin : BasePlugin
     {
         public const string PluginGuid = "com.local.wallrestraint";
         public const string PluginName = "WallRestraint";
-        public const string PluginVersion = "1.1.0";
+        public const string PluginVersion = "1.2.0";
         private const string ModelResource = "WallRestraint.assets.wallrestraint.wrm";
 
         internal static ManualLogSource Logger;
+        /// <summary>The wall restraint's registration with RestraintHub (ring entry, selection, F and + / -).</summary>
+        internal static Restraint Entry;
         public static ConfigEntry<float> Reach, MetalShade, KneeHeight, StepCm, ThighLean, ArchBulge, TubeClearanceCm, KneeOutside, TubeLift;
         public static ConfigEntry<int> DebugDisable;
         public static ConfigEntry<string> RingLabel;
@@ -69,6 +73,22 @@ namespace WallRestraint
             Patches.Apply(new HarmonyLib.Harmony(PluginGuid));
             ClassInjector.RegisterTypeInIl2Cpp<WallController>();
             AddComponent<WallController>();
+            Entry = new Restraint
+            {
+                Id = "WallRestraint",
+                RingValue = WallController.RingItemValue,
+                Label = () => RingLabel.Value,
+                ShortcutSaveKey = Patches.SaveKeyShortcuts,
+                Holds = BodyParts.Neck | BodyParts.Arms | BodyParts.Legs | BodyParts.Spot,
+                IsWorn = () => WallController.Instance != null && WallController.Instance.Machine.Worn,
+                // Held on the wall: no walking, running, crouching, peeing, pose skills or anything that needs her hands.
+                Blocks = () => RestraintHub.Blocks.Moving | RestraintHub.Blocks.Running | RestraintHub.Blocks.Crouching | RestraintHub.Blocks.Pee
+                               | RestraintHub.Blocks.HandActions | RestraintHub.Blocks.PoseSkills,
+                OnChosen = () => { var c = WallController.Instance; if (c != null) c.OnRingChosen(); },
+                Attempt = () => WallController.Instance == null ? 0f : WallController.Instance.Machine.Attempt,
+                Controls = "+/- height",
+            };
+            Hub.Register(Entry);
             Logger.LogInfo("[SFM-ACCEPT] load: " + PluginName + " " + PluginVersion + " ready (" + WallController.Model.Parts.Count + " parts)");
         }
 

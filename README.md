@@ -4,10 +4,15 @@ Wall-mounted restraints for SecretFlasherManaka (BepInEx 6 IL2CPP): she is held 
 collar, back arched over a rest, upper arms in cuffs beside it, knees bent with the shins going through leather-lined tubes into the
 wall. Single-player/offline only.
 
-**Status 1.1.0:** usable. Face a flat wall (within `Reach`), pick **Wall Restraint** in the common ring (hold 1; 5th page when
-SpreaderBar is installed too) or put it on a number key; hold **F** to struggle free (`Unlock.SuccessChance`, default: the first
+**Needs RestraintHub** (1.2.0+; included in the package): ring entry, number shortcuts, the list of worn restraints, F and + / -
+routing, input blocking and conflicts are the hub's (`mods/RestraintHub/README.md`). Refused while another restraint holds her
+neck, arms or legs (the yoke, the spreader bar, the game's handcuffs).
+
+**Status 1.2.0:** usable. Face a flat wall (within `Reach`), pick **Wall Restraint** in the common ring (hold 1; the restraint page
+after the game's, page 5) or put it on a number key; hold **F** to struggle free (`Unlock.SuccessChance`, default: the first
 attempt). Refusals are shown in the game's message bar ("Can't use the wall restraint here: ..."). Being restrained is not saved:
-a load starts free. While restrained, walking, running, crouching, peeing, masturbating and the handcuff ring entry are ignored;
+a load starts free. While restrained, walking, running, crouching, peeing, pose skills and everything that needs her hands
+(masturbating, toys, the handcuffs, drinking, dropping items, clothes; 1.2.0: refused with a message) are ignored;
 the camera can still be turned (it starts behind her, inside the wall - turn it half round).
 
 **Height (1.1.0):** she is placed as high as the wall allows, up to the preferred `Pose.KneeHeight` and down to kneeling (knees
@@ -83,9 +88,13 @@ and fences work now: a 1.64 m concrete fence takes her with the knees at 0.8 m.
   radii and 1 cm clearance without the lift - the calf still showed). Measuring the limbs from a bake while she stands was tried
   and dropped (the other leg / torso / hair got into the cuts: arm 1.9 cm, knee 7.4 cm).
 
+- L3 1.2.0 with RestraintHub (2026-10-24, Residence house wall): key 1 -> on the wall, selected in the hub's list; the spreader
+  bar's key refused ("holds her legs"); `-` at the lowest height -> "The wall is not flat enough lower down", `+` -> "height: knees
+  at 0.576 m"; F freed her. Details: `mods/RestraintHub/README.md`.
+
 ## Ring and lock code
-The ring entry / number shortcuts (`SfmKit.Game.RingEntry`), UI helpers (`SfmKit.Game.GameUi`) and the lock rules
-(`SfmKit.Pure.LockMachine`) and the + / - keys (`SfmKit.Game.PlusMinusKeys`) are shared in `src/SfmKit` (moved out of SpreaderBar, which still has its own ring code - to migrate).
+The ring entry, number shortcuts and the + / - and F routing are RestraintHub's (1.2.0); UI helpers (`SfmKit.Game.GameUi`) and the
+lock rules (`SfmKit.Pure.LockMachine`) are shared in `src/SfmKit`.
 
 ## Known limits / next
 - Limb radii are estimates (12-15 % of bone lengths). Measuring them from a bake while she stands failed (other leg, torso and hair

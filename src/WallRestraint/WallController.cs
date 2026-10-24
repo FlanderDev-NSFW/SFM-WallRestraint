@@ -99,12 +99,9 @@ namespace WallRestraint
         private System.Numerics.Vector3 _viewFrom;
         private GameObject _viewLight;
 
-        // Ring entry, lock state, the player's interact key (set by Patches.ResolvePostfix).
+        // Lock state. The ring entry, number shortcuts, F / + / - routing and the input blocking are RestraintHub's (Plugin.Entry).
         public const int RingItemValue = 9200; // SpreaderBar uses 9100
-        internal RingEntry Ring;
         internal readonly LockMachine Machine = new LockMachine();
-        internal bool InteractHeld;
-        private readonly GameUi _ui = new GameUi();
         private IntPtr _gameData;
         private static int _failures;
 
@@ -116,7 +113,6 @@ namespace WallRestraint
         private void Awake()
         {
             Instance = this;
-            Ring = new RingEntry(RingItemValue, Patches.LabelKey, OnRingChosen, Plugin.Logger, "wall restraint");
         }
 
         private void Update()
@@ -128,15 +124,13 @@ namespace WallRestraint
         [HideFromIl2Cpp]
         private void Tick()
         {
-            bool panel = _ui.PanelOpen();
-            Ring.Tick(panel);
-            WatchHeightKeys(panel);
+            WatchHeightKeys();
             TrackSaveIdentity();
             if (PlayerController.Instance == null || GameState.GameStateData == null) return;
             Machine.AttemptSeconds = Plugin.AttemptSeconds.Value; // live: config edits apply without a restart
             Machine.BaseChance = Plugin.SuccessChance.Value;
-            // Interactions take precedence: no struggling inside an interaction area, in menus or with the ring open.
-            bool unlockAllowed = InteractHeld && Machine.State == LockState.Locked && !panel && !GameUi.RingOpen() && !_ui.InInteractArea();
+            // F counts only while the wall restraint is the selected restraint, outside menus and interaction areas (the hub decides).
+            bool unlockAllowed = Plugin.Entry.StruggleHeld && Machine.State == LockState.Locked;
             switch (Machine.Tick(Time.deltaTime, unlockAllowed, UnityEngine.Random.value))
             {
                 case LockMachine.Event.Locked:
@@ -156,15 +150,10 @@ namespace WallRestraint
             }
         }
 
-        /// <summary>The ring entry (click or number shortcut).</summary>
+        /// <summary>The ring entry or a number key, when she is free and nothing worn holds the same parts (the hub checked).</summary>
         [HideFromIl2Cpp]
-        private void OnRingChosen()
+        internal void OnRingChosen()
         {
-            if (Machine.Worn)
-            {
-                GameUi.Message("Already restrained to the wall - hold F to struggle free.");
-                return;
-            }
             string result = Lock(false);
             if (_locked) GameUi.PlaySe(InGameSoundManager.SeType.CommonEquip);
             else GameUi.Message("Can't use the wall restraint here: " + (result.StartsWith("refused: ") ? result.Substring(9).Split(" (")[0] : result));
@@ -172,10 +161,9 @@ namespace WallRestraint
 
         /// <summary>A save was loaded: she starts free (the wall may not be there); the number shortcuts come back.</summary>
         [HideFromIl2Cpp]
-        internal void OnSaveLoaded(int shortcuts)
+        internal void OnSaveLoaded()
         {
             if (Machine.Worn || _locked) Release();
-            Ring.OnShortcutsLoaded(shortcuts);
             _gameData = GameState.GameStateData == null ? IntPtr.Zero : GameState.GameStateData.Pointer;
         }
 
@@ -188,7 +176,6 @@ namespace WallRestraint
             if (ptr == _gameData) return;
             _gameData = ptr;
             if (Machine.Worn || _locked) Release();
-            Ring.Reset();
         }
 
         private void Start()
@@ -406,14 +393,13 @@ namespace WallRestraint
         private const float MaxKneeShins = 3f; // the highest knee height tried (shin lengths), for + above the preferred one
         private BodyDims _body;
         private PoseParams _params;
-        private readonly PlusMinusKeys _heightKeys = new PlusMinusKeys();
 
         [HideFromIl2Cpp]
-        private void WatchHeightKeys(bool panel)
+        private void WatchHeightKeys()
         {
-            if (!_locked || Machine.State != LockState.Locked || panel || GameUi.RingOpen()) return;
-            int dir = _heightKeys.Poll();
-            if (dir == 0) return;
+            // + / - reach the wall restraint only while it is the selected restraint (the hub routes them, outside menus).
+            int dir = Plugin.Entry.TakeStep();
+            if (dir == 0 || !_locked || Machine.State != LockState.Locked) return;
             float step = Plugin.StepCm.Value / 100f;
             float now = _params.KneeHeight;
             float want = Math.Min(Math.Max(now + dir * step, _spot.KneeLow), _spot.KneeHigh);
