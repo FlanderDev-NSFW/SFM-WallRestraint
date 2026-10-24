@@ -35,7 +35,9 @@ namespace WallRestraint
         private static readonly HumanBodyBones[] Turned = { HumanBodyBones.Hips, HumanBodyBones.Spine, HumanBodyBones.Chest, HumanBodyBones.Neck,
             HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg, HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm };
         private readonly Quaternion[] _localAt = new Quaternion[8], _parentLocalAt = new Quaternion[8];
-        private Vector3 _rootAfter;
+        private Vector3 _rootAfter, _avatarPos, _avatarScale;
+        private Quaternion _avatarRot;
+        private readonly Vector3[] _localPos = new Vector3[8], _localScale = new Vector3[8], _parentPos = new Vector3[8], _parentScale = new Vector3[8];
         private int _followedFrame = -1;
 
         [HideFromIl2Cpp]
@@ -49,7 +51,15 @@ namespace WallRestraint
                 var t = anim.GetBoneTransform(Turned[i]);
                 _localAt[i] = t.localRotation;
                 _parentLocalAt[i] = t.parent.localRotation;
+                _localPos[i] = t.localPosition;
+                _localScale[i] = t.localScale;
+                _parentPos[i] = t.parent.localPosition;
+                _parentScale[i] = t.parent.localScale;
             }
+            Transform av = anim.transform;
+            _avatarPos = av.position;
+            _avatarRot = av.rotation;
+            _avatarScale = av.localScale;
         }
 
         [HideFromIl2Cpp]
@@ -71,6 +81,17 @@ namespace WallRestraint
                 sb.Append(' ').Append(Turned[i]).Append(' ').Append(F(Quaternion.Angle(t.localRotation, _localAt[i])))
                   .Append('/').Append(F(Quaternion.Angle(t.parent.localRotation, _parentLocalAt[i])));
             }
+            sb.Append("; local pos/scale change (own, parent):");
+            for (int i = 0; i < Turned.Length; i++)
+            {
+                var t = anim.GetBoneTransform(Turned[i]);
+                sb.Append(' ').Append(Turned[i]).Append(' ').Append(F((t.localPosition - _localPos[i]).magnitude)).Append('/')
+                  .Append(F((t.localScale - _localScale[i]).magnitude)).Append(',').Append(F((t.parent.localPosition - _parentPos[i]).magnitude))
+                  .Append('/').Append(F((t.parent.localScale - _parentScale[i]).magnitude));
+            }
+            Transform av = anim.transform;
+            sb.Append("; avatar '").Append(av.name).Append("' moved ").Append(F((av.position - _avatarPos).magnitude)).Append(" turned ")
+              .Append(F(Quaternion.Angle(av.rotation, _avatarRot))).Append(" scaled ").Append(F((av.localScale - _avatarScale).magnitude));
             MovedAfterLateUpdate = sb.ToString();
         }
         private Camera.CameraCallback _preCull;
@@ -109,6 +130,7 @@ namespace WallRestraint
         {
             bool panel = _ui.PanelOpen();
             Ring.Tick(panel);
+            WatchHeightKeys(panel);
             TrackSaveIdentity();
             if (PlayerController.Instance == null || GameState.GameStateData == null) return;
             Machine.AttemptSeconds = Plugin.AttemptSeconds.Value; // live: config edits apply without a restart
@@ -209,6 +231,7 @@ namespace WallRestraint
                     var anim = PlayerController.Instance?.Pca?.Animator;
                     if (anim != null && (Plugin.DebugDisable.Value & 1) == 0)
                     {
+                        WallPoser.RecordDrawn(anim);
                         WallPoser.Follow(anim, _spot.Frame, _layout, PoseParams.Default.CuffOnArm);
                         _rig.Place(_spot.Frame, _layout);
                     }
@@ -289,12 +312,19 @@ namespace WallRestraint
                 if (c._locked) Release();
                 var anim = player.Pca.Animator;
                 if (!WallPoser.Measure(anim, out BodyDims body, out string problem)) return "refused: " + problem;
-                var layout = WallPose.Layout(Model, body, Params());
-                if (layout.Problem != null && !force) return "refused: " + layout.Problem;
-                var spot = WallPlacer.Find(player, WallPose.Footprint(Model, layout), Plugin.Reach.Value, force);
+                // Height: as high as the wall allows up to the preferred knee height (config, in shin lengths), down to kneeling.
+                var prm = Params();
+                float kneeMin = WallPose.MinKneeHeight(Model, body, prm);
+                float kneeMax = Math.Max(kneeMin, MaxKneeShins * body.Shin);
+                float preferred = Math.Min(Math.Max(Plugin.KneeHeight.Value * body.Shin, kneeMin), kneeMax);
+                var spot = WallPlacer.Find(player, WallPose.Span(Model, body, prm), kneeMin, kneeMax, preferred, Plugin.Reach.Value, force);
                 c._spot = spot;
+                prm.KneeHeight = spot.Knee;
+                var layout = WallPose.Layout(Model, body, prm);
+                if (layout.Problem != null && !force) return "refused: " + layout.Problem;
                 string text = Describe(spot) + "; body spine " + F(body.Spine) + " thigh " + F(body.Thigh) + " shin " + F(body.Shin)
-                              + " upper arm " + F(body.UpperArm) + "; knees at " + F(layout.KneeR.Z) + " m, neck at " + F(layout.Neck.Z)
+                              + " upper arm " + F(body.UpperArm) + "; knees at " + F(layout.KneeR.Z) + " m (preferred " + F(preferred) + ", wall allows "
+                              + F(spot.KneeLow) + ".." + F(spot.KneeHigh) + ", kneeling " + F(kneeMin) + "), neck at " + F(layout.Neck.Z)
                               + " m; scales collar " + F(layout.CollarScale) + " rest " + F(layout.ArchScale) + " arm " + F(layout.ArmScale) + " leg " + F(layout.LegScale)
                               + (layout.Problem == null ? "" : "; layout problem: " + layout.Problem);
                 Plugin.Logger.LogInfo("[SFM-ACCEPT] lock: " + text + (spot.Map == null ? "" : Environment.NewLine + spot.Map));
@@ -305,6 +335,8 @@ namespace WallRestraint
                     c._rig.Build(anim.gameObject.layer);
                 }
                 c._layout = layout;
+                c._body = body;
+                c._params = prm;
                 c._rig.Place(spot.Frame, layout);
                 c._rig.SetVisible(true);
                 // Her root stands on the floor under her hips, facing out of the wall (the camera and the game follow it).
@@ -322,11 +354,37 @@ namespace WallRestraint
             }
         }
 
+        /// <summary>Diagnostics: turn her to face the nearest upright wall within reach (32 directions at hip height).</summary>
+        public static string FaceNearestWall()
+        {
+            var player = PlayerController.Instance;
+            if (player == null) return "not in game";
+            Transform pt = player.transform;
+            Vector3 eye = pt.position + Vector3.up * 1.0f;
+            float best = float.MaxValue;
+            Vector3 bestNormal = Vector3.zero;
+            string name = null;
+            for (int i = 0; i < 32; i++)
+            {
+                Vector3 dir = Quaternion.AngleAxis(i * 360f / 32f, Vector3.up) * Vector3.forward;
+                if (!WallSurvey.Cast(eye, dir, Plugin.Reach.Value, pt, out RaycastHit hit) || hit.distance >= best) continue;
+                Vector3 n = Vector3.ProjectOnPlane(hit.normal, Vector3.up);
+                if (n.sqrMagnitude < 0.9f) continue;
+                best = hit.distance;
+                bestNormal = n.normalized;
+                name = hit.collider.name;
+            }
+            if (name == null) return "no wall within reach";
+            pt.rotation = Quaternion.LookRotation(-bestNormal, Vector3.up);
+            return "facing '" + name + "' at " + F(best) + " m";
+        }
+
         public static string Release()
         {
             var c = Instance;
             if (c == null) return "no controller";
             c._locked = false;
+            WallPoser.ForgetDrawn();
             c.Machine.Reset();
             c._rig?.SetVisible(false);
             Plugin.Logger.LogInfo("[SFM-ACCEPT] release: unlocked");
@@ -337,9 +395,47 @@ namespace WallRestraint
         private static PoseParams Params()
         {
             var p = PoseParams.Default;
-            p.KneeHeightRatio = Plugin.KneeHeight.Value;
             p.ThighLean = Plugin.ThighLean.Value * Mathf.Deg2Rad;
+            p.TubeClearance = Plugin.TubeClearanceCm.Value / 100f;
+            p.KneeOutside = Plugin.KneeOutside.Value;
+            p.TubeLift = Plugin.TubeLift.Value;
             return p;
+        }
+
+        // --- height: + / - while restrained, within what the wall allowed at lock time -------------------------------------
+        private const float MaxKneeShins = 3f; // the highest knee height tried (shin lengths), for + above the preferred one
+        private BodyDims _body;
+        private PoseParams _params;
+        private readonly PlusMinusKeys _heightKeys = new PlusMinusKeys();
+
+        [HideFromIl2Cpp]
+        private void WatchHeightKeys(bool panel)
+        {
+            if (!_locked || Machine.State != LockState.Locked || panel || GameUi.RingOpen()) return;
+            int dir = _heightKeys.Poll();
+            if (dir == 0) return;
+            float step = Plugin.StepCm.Value / 100f;
+            float now = _params.KneeHeight;
+            float want = Math.Min(Math.Max(now + dir * step, _spot.KneeLow), _spot.KneeHigh);
+            if (Math.Abs(want - now) < 1e-4f)
+            {
+                GameUi.Message(dir > 0 ? "The wall is not tall enough to lift her higher." : (want <= WallPose.MinKneeHeight(Model, _body, _params) + 1e-3f
+                    ? "She is kneeling - as low as it goes." : "The wall is not flat enough lower down."));
+                return;
+            }
+            var span = WallPose.Span(Model, _body, _params);
+            var player = PlayerController.Instance;
+            string blocked = player == null ? null : WallPlacer.InTheWay(_spot.Frame, (span.HalfWidth, want + span.Below, want + span.Above), _spot.ColliderPtr, player.transform);
+            if (blocked != null)
+            {
+                GameUi.Message("Something is in the way (" + blocked + ").");
+                return;
+            }
+            _params.KneeHeight = want;
+            _layout = WallPose.Layout(Model, _body, _params);
+            _rig.Place(_spot.Frame, _layout);
+            Plugin.KneeHeight.Value = want / _body.Shin; // remembered (saved to the config) for the next time
+            Plugin.Logger.LogInfo("[SFM-ACCEPT] height: knees at " + F(want) + " m (" + F(want / _body.Shin) + " shins; wall allows " + F(_spot.KneeLow) + ".." + F(_spot.KneeHigh) + ")");
         }
 
         private void LateUpdate()
@@ -356,7 +452,9 @@ namespace WallRestraint
                 player.transform.SetPositionAndRotation(_rootAt, _rootRot);
                 if ((Plugin.DebugDisable.Value & 1) == 0)
                 {
+                    WallPoser.UseDrawnLengths(player.Pca.Animator, (Plugin.DebugDisable.Value & 2) == 0);
                     WallPoser.Apply(player.Pca.Animator, _spot.Frame, _layout, Plugin.ArchBulge.Value);
+                    WallPoser.RestoreAnimatedLengths(player.Pca.Animator);
                     RecordAfterLateUpdate(player);
                 }
             }

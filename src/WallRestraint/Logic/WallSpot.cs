@@ -62,6 +62,69 @@ namespace WallRestraint.Logic
             return r;
         }
 
+        public struct HeightFit
+        {
+            public bool Ok;
+            public float Knee;         // the chosen knee height (m above the floor)
+            public float Low, High;    // the contiguous range of knee heights around it that fit (for + / -)
+            public Result Surface;     // the wall under the chosen footprint
+            public string Reason;      // why nothing fits
+        }
+
+        /// <summary>
+        /// Which knee heights the wall allows. <paramref name="depth"/> is one tall probe (as for <see cref="Judge"/>; row 0's
+        /// lower edge at <paramref name="rowBase"/> m above the floor, rows <paramref name="cellY"/> high). The footprint for a
+        /// knee height k covers k + <paramref name="below"/> .. k + <paramref name="above"/> (everything in the pose moves with
+        /// the knees). Candidates run from <paramref name="kMin"/> to <paramref name="kMax"/> in <paramref name="step"/>; the one
+        /// nearest <paramref name="preferred"/> that fits wins (ties: the lower).
+        /// </summary>
+        public static HeightFit Heights(float[] depth, int width, int height, float cellX, float cellY, float rowBase,
+                                        float below, float above, float kMin, float kMax, float step, float preferred,
+                                        float maxBump, float maxSlope)
+        {
+            var fit = new HeightFit();
+            int n = Math.Max(1, (int)Math.Floor((kMax - kMin) / step + 1e-4) + 1);
+            var ok = new bool[n];
+            var results = new Result[n];
+            for (int i = 0; i < n; i++)
+            {
+                float k = kMin + i * step;
+                int r0 = (int)Math.Floor((k + below - rowBase) / cellY), r1 = (int)Math.Ceiling((k + above - rowBase) / cellY);
+                if (r0 < 0 || r1 > height || r1 - r0 < 2)
+                {
+                    results[i] = new Result { Reason = "the wall is not tall enough there" };
+                    continue;
+                }
+                var sub = new float[width * (r1 - r0)];
+                Array.Copy(depth, r0 * width, sub, 0, sub.Length);
+                results[i] = Judge(sub, width, r1 - r0, cellX, cellY, maxBump, maxSlope);
+                ok[i] = results[i].Ok;
+            }
+            int want = (int)Math.Round((Math.Min(Math.Max(preferred, kMin), kMax) - kMin) / step);
+            want = Math.Min(Math.Max(want, 0), n - 1);
+            int best = -1;
+            for (int d = 0; d < n && best < 0; d++)
+            {
+                if (want - d >= 0 && ok[want - d]) best = want - d;
+                else if (want + d < n && ok[want + d]) best = want + d;
+            }
+            if (best < 0)
+            {
+                fit.Reason = results[want].Reason ?? "the wall does not fit";
+                fit.Surface = results[want];
+                return fit;
+            }
+            int lo = best, hi = best;
+            while (lo > 0 && ok[lo - 1]) lo--;
+            while (hi < n - 1 && ok[hi + 1]) hi++;
+            fit.Ok = true;
+            fit.Knee = kMin + best * step;
+            fit.Low = kMin + lo * step;
+            fit.High = kMin + hi * step;
+            fit.Surface = results[best];
+            return fit;
+        }
+
         /// <summary>
         /// The patch as text for the log, top row first: '.' on the fitted plane (within <paramref name="tolerance"/>), a digit
         /// = recessed by that many cm (9 = 9 or more), a letter = sticks out by A = 1 .. I = 9 cm (# more), ' ' nothing drawn.

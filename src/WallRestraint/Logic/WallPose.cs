@@ -15,20 +15,25 @@ namespace WallRestraint.Logic
         public float UpperArm, Forearm;
         public float BackDepth;    // chest bone -> skin of the back
         public float NeckRadius, ArmRadius, KneeRadius;
+        public float ShinRadius;   // the shin where the leg tube closes (0 = not measured: the knee radius is used)
     }
 
     /// <summary>Tunable shape of the pose (config).</summary>
     public struct PoseParams
     {
-        public float KneeHeightRatio;  // knee height above the floor, in shin lengths
+        public float KneeHeight;       // knee centre above the floor (m); see WallPose.MinKneeHeight and WallSpot.Heights
         public float KneeSpread;       // knee centre sideways from the middle, in hip half widths
         public float ThighLean;        // thighs lean out of the wall (radians from vertical)
         public float CuffOnArm;        // arm cuff along the upper arm (0 shoulder .. 1 elbow)
-        public float Clearance;        // gap between limb and restraint (m)
+        public float KneeOutside;      // knee joint in front of the tube mouth, in knee radii (the tube closes around the shin below it)
+        public float TubeLift;         // tube axis above the shin bone, in knee radii: the shin bone is at the front of the leg, so
+                                       // with the shins level the calf (the thick part) is above it
+        public float Clearance;        // gap between limb and collar / arm cuff (m)
+        public float TubeClearance;    // gap between leg and tube (m): the calf, the leg's thickest part, sits in the tube
 
         public static PoseParams Default => new PoseParams
         {
-            KneeHeightRatio = 2.4f, KneeSpread = 2.2f, ThighLean = 0.35f, CuffOnArm = 0.8f, Clearance = 0.004f,
+            KneeHeight = 1f, KneeSpread = 2.2f, ThighLean = 0.35f, CuffOnArm = 0.8f, Clearance = 0.004f, TubeClearance = 0.01f, KneeOutside = 1.3f, TubeLift = 0.35f,
         };
     }
 
@@ -44,6 +49,7 @@ namespace WallRestraint.Logic
         public Vector3 ArchAt; public float ArchScale;  // the rest's base on the wall, middle height
         public Vector3 ArmAtR, ArmAtL; public float ArmScale;
         public Vector3 LegAtR, LegAtL; public float LegScale;
+        public float TubeLift;                 // m above the shin bone (see PoseParams.TubeLift)
         public string Problem;                 // null when everything fits
     }
 
@@ -61,14 +67,15 @@ namespace WallRestraint.Logic
             // Restraint scales from the limbs.
             o.CollarScale = (b.NeckRadius + p.Clearance) / m.CollarInnerRadius;
             o.ArmScale = (b.ArmRadius + p.Clearance) / m.Arms[0].InnerRadius;
-            o.LegScale = (b.KneeRadius + p.Clearance) / m.Legs[0].InnerRadius;
+            o.LegScale = LegScale(m, b, p);
 
             // Legs: the tubes stand out of the wall as modelled (scaled); the knees just outside their mouths, the shins level
             // through them into the wall.
-            float kz = p.KneeHeightRatio * b.Shin;
+            float kz = p.KneeHeight;
             float ky = p.KneeSpread * b.HipHalf;
             float mouthX = m.Legs[0].Mouth.X * o.LegScale;
-            float kneeX = mouthX + 0.8f * b.KneeRadius;
+            // 0.8 knee radii put the knee's bulge over the tube's rim (seen through a glass wall) [observed 2026-10-24].
+            float kneeX = mouthX + p.KneeOutside * b.KneeRadius;
             o.KneeR = new Vector3(kneeX, ky, kz);
             o.KneeL = new Vector3(kneeX, -ky, kz);
             o.FootR = o.KneeR - new Vector3(b.Shin, 0, 0);
@@ -119,9 +126,29 @@ namespace WallRestraint.Logic
             o.HandR = o.ElbowR - new Vector3(0, 0, b.Forearm);
             o.HandL = o.ElbowL - new Vector3(0, 0, b.Forearm);
 
-            o.LegAtR = new Vector3(mouthX, ky, kz);
-            o.LegAtL = new Vector3(mouthX, -ky, kz);
+            o.TubeLift = p.TubeLift * b.KneeRadius;
+            o.LegAtR = new Vector3(mouthX, ky, kz + o.TubeLift);
+            o.LegAtL = new Vector3(mouthX, -ky, kz + o.TubeLift);
             return o;
+        }
+
+        public static float LegScale(WallModel m, in BodyDims b, in PoseParams p) =>
+            ((b.ShinRadius > 0f ? b.ShinRadius : b.KneeRadius) + p.TubeClearance) / m.Legs[0].InnerRadius;
+
+        /// <summary>Kneeling: the lowest knee height, where the leg tubes (lifted by TubeLift) and the knee itself still clear the
+        /// floor by 1 cm.</summary>
+        public static float MinKneeHeight(WallModel m, in BodyDims b, in PoseParams p) =>
+            Math.Max(m.Legs[0].OuterRadius * LegScale(m, b, p) - p.TubeLift * b.KneeRadius, b.KneeRadius) + 0.01f;
+
+        /// <summary>
+        /// Every height in the layout moves 1:1 with the knee height (x and y do not change), so the footprint's bottom and top
+        /// are fixed offsets from it: (bottom - knee height, top - knee height).
+        /// </summary>
+        public static (float Below, float Above, float HalfWidth) Span(WallModel m, in BodyDims b, PoseParams p)
+        {
+            p.KneeHeight = 1f;
+            var fp = Footprint(m, Layout(m, b, p));
+            return (fp.Bottom - 1f, fp.Top - 1f, fp.HalfWidth);
         }
 
         /// <summary>

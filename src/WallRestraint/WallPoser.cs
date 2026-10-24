@@ -54,6 +54,59 @@ namespace WallRestraint
             return true;
         }
 
+        // Bone lengths as drawn. Between LateUpdate and the render the bones' local positions change (knee joint 6 cm along the
+        // thigh, chest 3 cm; no rotation, the avatar and the PlayerBoneScaleAdjuster nodes unchanged) [observed 2026-10-24,
+        // WallController.MovedAfterLateUpdate]. Aiming with the LateUpdate lengths tilted the shins ~9 deg and put the knees
+        // 8 cm off. The change builds on the value it finds (restoring the drawn positions in LateUpdate fed back: 22 km in a few
+        // seconds), so the offset it adds is recorded instead: drawn - animator, per bone. The aim runs with animator + offset,
+        // then the animator's values are put back for the game to adjust as usual.
+        private static readonly HumanBodyBones[] Posed = {
+            HumanBodyBones.Spine, HumanBodyBones.Chest, HumanBodyBones.Neck, HumanBodyBones.Head,
+            HumanBodyBones.LeftUpperLeg, HumanBodyBones.RightUpperLeg, HumanBodyBones.LeftLowerLeg, HumanBodyBones.RightLowerLeg,
+            HumanBodyBones.LeftFoot, HumanBodyBones.RightFoot, HumanBodyBones.LeftUpperArm, HumanBodyBones.RightUpperArm,
+            HumanBodyBones.LeftLowerArm, HumanBodyBones.RightLowerArm, HumanBodyBones.LeftHand, HumanBodyBones.RightHand };
+        private static readonly Vector3[] Animated = new Vector3[Posed.Length], Offset = new Vector3[Posed.Length];
+        private static bool _haveAnimated, _haveOffset;
+
+        /// <summary>LateUpdate, before aiming: remember the animator's local positions and, once the offset is known, give the
+        /// bones their drawn lengths for the aim.</summary>
+        public static void UseDrawnLengths(Animator anim, bool enabled)
+        {
+            for (int i = 0; i < Posed.Length; i++)
+            {
+                var t = anim.GetBoneTransform(Posed[i]);
+                if (t == null) continue;
+                Animated[i] = t.localPosition;
+                if (enabled && _haveOffset) t.localPosition = Animated[i] + Offset[i];
+            }
+            _haveAnimated = true;
+        }
+
+        /// <summary>LateUpdate, after aiming: the animator's local positions back (the game adds its offset again).</summary>
+        public static void RestoreAnimatedLengths(Animator anim)
+        {
+            if (!_haveAnimated) return;
+            for (int i = 0; i < Posed.Length; i++)
+            {
+                var t = anim.GetBoneTransform(Posed[i]);
+                if (t != null) t.localPosition = Animated[i];
+            }
+        }
+
+        /// <summary>At render time (onPreCull): the offset the game added since LateUpdate.</summary>
+        public static void RecordDrawn(Animator anim)
+        {
+            if (!_haveAnimated) return;
+            for (int i = 0; i < Posed.Length; i++)
+            {
+                var t = anim.GetBoneTransform(Posed[i]);
+                if (t != null) Offset[i] = t.localPosition - Animated[i];
+            }
+            _haveOffset = true;
+        }
+
+        public static void ForgetDrawn() => _haveAnimated = _haveOffset = false;
+
         /// <summary>
         /// Aiming bones leaves the joints a few cm from their targets (the avatar's own offsets), so the restraints follow the
         /// posed bones: height and sideways from the neck, the upper arms and the knees; the distance from the wall stays the
@@ -68,8 +121,8 @@ namespace WallRestraint
             Vector3 ArmPoint(HumanBodyBones upper, HumanBodyBones lower) => Vector3.Lerp(B(upper).position, B(lower).position, cuffOnArm);
             o.ArmAtL = Keep(o.ArmAtL, ArmPoint(HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm));
             o.ArmAtR = Keep(o.ArmAtR, ArmPoint(HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm));
-            o.LegAtL = Keep(o.LegAtL, B(HumanBodyBones.LeftLowerLeg).position);
-            o.LegAtR = Keep(o.LegAtR, B(HumanBodyBones.RightLowerLeg).position);
+            o.LegAtL = Keep(o.LegAtL, B(HumanBodyBones.LeftLowerLeg).position) + new NVector3(0, 0, o.TubeLift);
+            o.LegAtR = Keep(o.LegAtR, B(HumanBodyBones.RightLowerLeg).position) + new NVector3(0, 0, o.TubeLift);
         }
 
         /// <summary>Turn <paramref name="bone"/> so that <paramref name="child"/> lies in the direction of <paramref name="target"/>.</summary>

@@ -81,7 +81,8 @@ namespace WallRestraint.Tests
                 Check(Near(Vector3.Distance(o.Hips, o.Neck), b.Spine, 1e-3f), name + ": spine keeps its length");
                 Check(Near(Vector3.Distance(o.ShoulderR, o.ElbowR), b.UpperArm, 1e-3f) && Near(Vector3.Distance(o.ElbowR, o.HandR), b.Forearm, 1e-3f),
                       name + ": arms keep their length");
-                Check(Near(o.KneeR.Z, p.KneeHeightRatio * b.Shin) && o.FootR.X < 0 && Near(o.FootR.Z, o.KneeR.Z), name + ": shins go level into the wall");
+                Check(Near(o.LegAtR.Z, o.KneeR.Z + p.TubeLift * b.KneeRadius) && o.LegAtR.Z > o.KneeR.Z, name + ": leg tubes lifted over the calf");
+                Check(Near(o.KneeR.Z, p.KneeHeight) && o.FootR.X < 0 && Near(o.FootR.Z, o.KneeR.Z), name + ": shins go level into the wall");
                 Check(o.KneeR.Y > 0 && o.KneeL.Y < 0 && o.ShoulderR.Y > 0, name + ": her right is +y");
                 Check(o.Neck.Z > o.Hips.Z && o.Hips.Z > o.KneeR.Z && o.KneeR.Z > o.FootR.Z - 1e-4f, name + ": neck above hips above knees");
                 Check(Near(o.CollarAt.X, m.CollarCenter.X * o.CollarScale) && Near(o.CollarScale * m.CollarInnerRadius, b.NeckRadius + p.Clearance),
@@ -89,9 +90,32 @@ namespace WallRestraint.Tests
                 Check(Near(o.ArmAtR.X, m.Arms[0].Center.X * o.ArmScale) && o.ArmAtR.Z < o.ShoulderR.Z, name + ": arm cuffs below the shoulders, on their brackets");
                 Check(o.ArchScale > 0.2f && Near(o.ArchScale * m.ArchApexOut, o.BackContact.X), name + ": back rest reaches her back (scale " + o.ArchScale + ")");
                 Check(o.BackContact.Z > o.Hips.Z && o.BackContact.Z < o.Neck.Z, name + ": back rest between hips and neck");
-                Check(o.LegAtR.X < o.KneeR.X && Near(o.LegScale * m.Legs[0].InnerRadius, b.KneeRadius + p.Clearance), name + ": leg tubes just below the knees");
+                Check(o.LegAtR.X < o.KneeR.X && Near(o.LegScale * m.Legs[0].InnerRadius, b.KneeRadius + p.TubeClearance), name + ": leg tubes just below the knees");
                 Check(Near(o.LegAtR.X, m.Legs[0].Mouth.X * o.LegScale) && o.LegAtR.X > 0.03f, name + ": leg tubes stick out of the wall as modelled");
             }
+            foreach (var (name, b) in new[] { ("adult", Adult), ("small", Small) })
+            {
+                var p = PoseParams.Default;
+                var span = WallPose.Span(m, b, p);
+                p.KneeHeight = 0.7f;
+                var fpA = WallPose.Footprint(m, WallPose.Layout(m, b, p));
+                p.KneeHeight = 1.1f;
+                var fpB = WallPose.Footprint(m, WallPose.Layout(m, b, p));
+                Check(Near(fpB.Bottom - fpA.Bottom, 0.4f, 1e-4f) && Near(fpB.Top - fpA.Top, 0.4f, 1e-4f) && Near(fpA.HalfWidth, fpB.HalfWidth)
+                      && Near(fpA.Bottom, 0.7f + span.Below, 1e-4f) && Near(fpA.Top, 0.7f + span.Above, 1e-4f),
+                      name + ": the footprint moves 1:1 with the knee height (Span)");
+                p.KneeHeight = WallPose.MinKneeHeight(m, b, p);
+                var kneel = WallPose.Layout(m, b, p);
+                float tubeBottom = kneel.LegAtR.Z - m.Legs[0].OuterRadius * kneel.LegScale;
+                Check(kneel.Problem == null && tubeBottom >= 0.01f - 1e-4f && kneel.KneeR.Z >= b.KneeRadius + 0.01f - 1e-4f
+                      && (Near(tubeBottom, 0.01f, 1e-4f) || Near(kneel.KneeR.Z, b.KneeRadius + 0.01f, 1e-4f)) && kneel.Hips.Z > kneel.KneeR.Z,
+                      name + ": kneeling - tubes and knees clear the floor, one of them by just 1 cm (knees at " + p.KneeHeight.ToString("0.000") + " m)");
+            }
+            var shinBody = Adult;
+            shinBody.ShinRadius = 0.04f;
+            var shinLayout = WallPose.Layout(m, shinBody, PoseParams.Default);
+            Check(Near(shinLayout.LegScale * m.Legs[0].InnerRadius, 0.04f + PoseParams.Default.TubeClearance) && shinLayout.KneeR.X > shinLayout.LegAtR.X + shinBody.KneeRadius,
+                  "pose: a measured shin sizes the tube; the knee stays a knee radius and more outside its mouth");
             var wide = PoseParams.Default;
             wide.KneeSpread = 20f;
             Check(WallPose.Layout(m, Adult, wide).Problem != null, "pose: impossible knee spread reported");
@@ -166,6 +190,29 @@ namespace WallRestraint.Tests
             Check(!holey.Ok && holey.Empty == 1 && holey.Reason.Contains("gaps"), "spot: a gap rejected");
             var empty = WallSpot.Judge(Grid((x, y) => float.NaN), w, h, cx, cy, 0.015f, 0.09f);
             Check(!empty.Ok && empty.Reason.Contains("invisible"), "spot: nothing drawn (invisible blocker) rejected");
+
+            // Heights: one tall probe, 16 x 64 rows of 4 cm from the floor (0 .. 2.56 m); footprint = knee - 0.10 .. knee + 0.85.
+            const int tw = 16, th = 64;
+            const float tcy = 0.04f, below = -0.10f, above = 0.85f;
+            float[] Wall(Func<float, float> depthAtHeight)
+            {
+                var g = new float[tw * th];
+                for (int j = 0; j < th; j++)
+                    for (int i = 0; i < tw; i++)
+                        g[j * tw + i] = depthAtHeight((j + 0.5f) * tcy);
+                return g;
+            }
+            WallSpot.HeightFit H(float[] g, float preferred) =>
+                WallSpot.Heights(g, tw, th, 0.05f, tcy, 0f, below, above, 0.11f, 1.3f, 0.01f, preferred, 0.015f, 0.09f);
+            var fence = H(Wall(y => y < 1.6f ? 0f : float.NaN), 1.04f); // a 1.6 m fence: nothing drawn above it
+            Check(fence.Ok && fence.Knee < 1.04f && fence.Knee + above <= 1.6f + 1e-3f && fence.Knee + above > 1.6f - 0.06f && Near(fence.High, fence.Knee) && Near(fence.Low, 0.11f),
+                  "heights: low fence - as high as fits under its top (" + fence.Knee.ToString("0.00") + "), down to kneeling");
+            var tall = H(Wall(y => 0f), 1.04f);
+            Check(tall.Ok && Near(tall.Knee, 1.04f, 1e-3f) && tall.High > 1.2f, "heights: tall wall - the preferred height, + can go higher");
+            var plinth = H(Wall(y => y < 0.3f ? -0.05f : 0f), 0.11f); // a plinth 5 cm out up to 30 cm
+            Check(plinth.Ok && plinth.Knee + below >= 0.3f - 0.04f && Near(plinth.Low, plinth.Knee), "heights: plinth at the bottom - kneeling refused, the lowest height above it (" + plinth.Knee.ToString("0.00") + ")");
+            var blocker = H(Wall(y => float.NaN), 1.04f);
+            Check(!blocker.Ok && blocker.Reason != null, "heights: invisible wall refused (" + blocker.Reason + ")");
         }
     }
 }
