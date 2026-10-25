@@ -102,7 +102,6 @@ namespace WallRestraint
         // Lock state. The ring entry, number shortcuts, F / + / - routing and the input blocking are RestraintHub's (Plugin.Entry).
         public const int RingItemValue = 9200; // SpreaderBar uses 9100
         internal readonly LockMachine Machine = new LockMachine();
-        private IntPtr _gameData;
         private static int _failures;
 
         internal static void Fail(string where, Exception e)
@@ -125,7 +124,6 @@ namespace WallRestraint
         private void Tick()
         {
             WatchHeightKeys();
-            TrackSaveIdentity();
             if (PlayerController.Instance == null || GameState.GameStateData == null) return;
             Machine.AttemptSeconds = Plugin.AttemptSeconds.Value; // live: config edits apply without a restart
             Machine.BaseChance = Plugin.SuccessChance.Value;
@@ -164,17 +162,12 @@ namespace WallRestraint
         internal void OnSaveLoaded()
         {
             if (Machine.Worn || _locked) Release();
-            _gameData = GameState.GameStateData == null ? IntPtr.Zero : GameState.GameStateData.Pointer;
         }
 
-        /// <summary>A new game or the title screen replaces the game data without a load: free her, forget the keys.</summary>
+        /// <summary>A new game or the title screen replaces the game data without a load (RestraintHub's OnNewGame): free her.</summary>
         [HideFromIl2Cpp]
-        private void TrackSaveIdentity()
+        internal void OnNewGame()
         {
-            var data = GameState.GameStateData;
-            IntPtr ptr = data == null ? IntPtr.Zero : data.Pointer;
-            if (ptr == _gameData) return;
-            _gameData = ptr;
             if (Machine.Worn || _locked) Release();
         }
 

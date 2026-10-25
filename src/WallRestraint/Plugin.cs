@@ -11,12 +11,12 @@ using WallRestraint.Logic;
 namespace WallRestraint
 {
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-    [BepInDependency(Hub.Guid, BepInDependency.DependencyFlags.HardDependency)]
+    [BepInDependency(Hub.Guid, "0.3.0")] // OnSave / OnLoad / OnNewGame
     public sealed class Plugin : BasePlugin
     {
         public const string PluginGuid = "com.local.wallrestraint";
         public const string PluginName = "WallRestraint";
-        public const string PluginVersion = "1.3.0";
+        public const string PluginVersion = "1.3.1";
         private const string ModelResource = "WallRestraint.assets.wallrestraint.wrm";
 
         internal static ManualLogSource Logger;
@@ -74,7 +74,6 @@ namespace WallRestraint
                 Logger.LogError("Wall restraint model could not be loaded, the mod is disabled: " + e.Message);
                 return;
             }
-            Patches.Apply(new HarmonyLib.Harmony(PluginGuid));
             ClassInjector.RegisterTypeInIl2Cpp<WallController>();
             AddComponent<WallController>();
             Entry = new Restraint
@@ -83,6 +82,8 @@ namespace WallRestraint
                 RingValue = WallController.RingItemValue,
                 Label = () => RingLabel.Value,
                 ShortcutSaveKey = Patches.SaveKeyShortcuts,
+                OnLoad = Patches.Load,
+                OnNewGame = () => WallController.Instance?.OnNewGame(),
                 Holds = BodyParts.Neck | BodyParts.Arms | BodyParts.Legs | BodyParts.Spot,
                 IsWorn = () => WallController.Instance != null && WallController.Instance.Machine.Worn,
                 // Held on the wall: no walking, running, crouching, peeing, pose skills or anything that needs her hands.

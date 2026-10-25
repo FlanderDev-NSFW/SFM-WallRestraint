@@ -4,7 +4,7 @@
   <PropertyGroup>
     <AssemblyName>WallRestraint</AssemblyName>
     <RootNamespace>WallRestraint</RootNamespace>
-    <Version>1.3.0</Version>
+    <Version>1.3.1</Version>
     <Description>WallRestraint - wall-mounted restraints for SecretFlasherManaka (BepInEx IL2CPP)</Description>
   </PropertyGroup>
 
