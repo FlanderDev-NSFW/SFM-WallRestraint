@@ -9,9 +9,9 @@
     <RootNamespace>WallRestraint.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\..\mods\WallRestraint\Logic\**\*.cs" Link="Logic\%(RecursiveDir)%(Filename)%(Extension)" />
-    <Compile Include="..\..\src\SfmKit\Pure\**\*.cs" Link="SfmKit.Pure\%(RecursiveDir)%(Filename)%(Extension)" />
-    <None Include="..\..\mods\WallRestraint\assets\wallrestraint.wrm" Link="wallrestraint.wrm" CopyToOutputDirectory="PreserveNewest"
-          Condition="Exists('..\..\mods\WallRestraint\assets\wallrestraint.wrm')" />
+    <Compile Include="..\..\src\WallRestraint\Logic\**\*.cs" Link="Logic\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="..\..\lib\SfmKit\Pure\**\*.cs" Link="SfmKit.Pure\%(RecursiveDir)%(Filename)%(Extension)" />
+    <None Include="..\..\src\WallRestraint\assets\wallrestraint.wrm" Link="wallrestraint.wrm" CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('..\..\src\WallRestraint\assets\wallrestraint.wrm')" />
   </ItemGroup>
 </Project>

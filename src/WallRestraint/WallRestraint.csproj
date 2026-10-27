@@ -6,6 +6,8 @@
     <RootNamespace>WallRestraint</RootNamespace>
     <Version>1.4.0</Version>
     <Description>WallRestraint - wall-mounted restraints for SecretFlasherManaka (BepInEx IL2CPP)</Description>
+    <!-- Compiles against RestraintHub (build/SfmMod.targets); players install it separately. -->
+    <SfmUsesRestraintHub>true</SfmUsesRestraintHub>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,8 +15,6 @@
     <Reference Include="UnityEngine.UIModule"><HintPath>$(SfmInterop)\UnityEngine.UIModule.dll</HintPath><Private>false</Private></Reference>
     <!-- The model, exported from TheWall.blend by tools/export_model.py (see README). -->
     <EmbeddedResource Include="assets\wallrestraint.wrm" LogicalName="WallRestraint.assets.wallrestraint.wrm" />
-    <!-- Hard dependency: ring entry, selection, F / + / - routing, input blocking (deployed and packaged next to this mod). -->
-    <ProjectReference Include="..\RestraintHub\RestraintHub.csproj" Private="false" />
   </ItemGroup>
 
   <!-- Compile the shared SfmKit sources into this DLL (remove this line if you do not use it). -->
