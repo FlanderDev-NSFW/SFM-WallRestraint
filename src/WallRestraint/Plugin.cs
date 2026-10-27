@@ -11,12 +11,12 @@ using WallRestraint.Logic;
 namespace WallRestraint
 {
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-    [BepInDependency(Hub.Guid, "0.3.0")] // OnSave / OnLoad / OnNewGame
+    [BepInDependency(Hub.Guid, "1.0.0")] // OnSave / OnLoad / OnNewGame
     public sealed class Plugin : BasePlugin
     {
-        public const string PluginGuid = "com.local.wallrestraint";
+        public const string PluginGuid = "FlanderDev.SFM.WallRestraint";
         public const string PluginName = "WallRestraint";
-        public const string PluginVersion = "1.3.1";
+        public const string PluginVersion = "1.4.0";
         private const string ModelResource = "WallRestraint.assets.wallrestraint.wrm";
 
         internal static ManualLogSource Logger;
