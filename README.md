@@ -3,6 +3,8 @@
 Wall restraints for **Secret Flasher Manaka**: she is locked against a wall, lifted off the floor. A collar holds her neck,
 a rest arches her back, cuffs hold her upper arms, and her shins go into tubes in the wall.
 
+Model: ["Display Model - Wall Restraint"](https://smutba.se/project/0c0e09e3-9217-4634-a568-54e9c23285a7/) by bruhmoment ([CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/)).
+
 ## Requirements
 - Secret Flasher Manaka (tested with v1.1.3)
 - BepInEx 6 for IL2CPP (tested with build 738)
@@ -37,7 +39,7 @@ The camera starts behind her, inside the wall: turn it round to see her.
 - Curtains can count as a wall.
 - After struggling free she faces away from the wall.
 
-Single-player / offline only. Code: MIT licence (`LICENSE.txt`). Model: "Display Model - Wall Restraint" by bruhmoment, CC BY-NC-ND 4.0 (smutba.se; details in `LICENSE-MODELS.txt`).
+Single-player / offline only. Code: MIT licence (`LICENSE.txt`). Model: ["Display Model - Wall Restraint"](https://smutba.se/project/0c0e09e3-9217-4634-a568-54e9c23285a7/) by bruhmoment, CC BY-NC-ND 4.0 (smutba.se; details in `LICENSE-MODELS.txt`).
 
 ## Building from source
 - .NET SDK 8, and a copy of the game with BepInEx 6 IL2CPP started once: copy `Directory.Build.local.props.example` to
