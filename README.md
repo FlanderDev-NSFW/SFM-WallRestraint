@@ -1,4 +1,4 @@
-# WallRestraint 1.4.0
+# WallRestraint 1.5.0
 
 Wall restraints for **Secret Flasher Manaka**: she is locked against a wall, lifted off the floor. A collar holds her neck,
 a rest arches her back, cuffs hold her upper arms, and her shins go into tubes in the wall.
@@ -8,7 +8,7 @@ Model: ["Display Model - Wall Restraint"](https://smutba.se/project/0c0e09e3-921
 ## Requirements
 - Secret Flasher Manaka (tested with v1.1.3)
 - BepInEx 6 for IL2CPP (tested with build 738)
-- **RestraintHub 1.0.0** or newer
+- **RestraintHub 1.1.0** or newer
 
 ## Install
 Extract the zip into the game folder (the folder with `SecretFlasherManaka.exe`). You get `BepInEx/plugins/WallRestraint/`.
@@ -23,6 +23,8 @@ If the wall does not fit (too far, bumpy, furniture in the way), a message says 
 | hold `F` | struggle free |
 
 The camera starts behind her, inside the wall: turn it round to see her.
+
+Missions (Custom Missions v2) can put it on and lock it through RestraintHub: `RtHub_CanApply("WallRestraint")` tells whether there is a wall, `RtHub_Apply("WallRestraint")`, setting `height` (cm, her knees) - see [Missions.md](https://github.com/FlanderDev-NSFW/SFM-RestraintHub/blob/main/docs/Missions.md).
 
 ## Settings
 `BepInEx/config/FlanderDev.SFM.WallRestraint.cfg` (created on the first start). Most useful:

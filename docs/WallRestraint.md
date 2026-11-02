@@ -104,6 +104,7 @@ and fences work now: a 1.64 m concrete fence takes her with the knees at 0.8 m.
   too big): before, the inset showed the collar as a wide plate around the neck base and the arm tubes about twice her arms' width.
   Neck 7 % of the spine + 0.4 cm: the collar sits around the neck, the choker just above it (front and three-quarter view). Arms
   9 % still about twice her arm, 7.5 %: the cuffs close around the upper arms, nothing through them. Lock accepted as before.
+- L3 1.1.0 (2026-11-02, with RestraintHub 1.1.0 and the test missions - details in RestraintHub's `docs/RestraintHub.md`, L3 1.1.0): `CanPutOn` (placement with `check`: "no wall in front of her" on the street, "the wall is not flat there" at the intercom, ok at the house wall), put on by a mission, setting `height` 75.6 -> 60 -> 500 clamped to 128.6 cm (the wall's top), config KneeHeight unchanged, taken off by the mission. `+` / `-` go through the same `SetKneeHeight`.
 
 ## Ring and lock code
 The ring entry, number shortcuts and the + / - and F routing are RestraintHub's (1.2.0); UI helpers (`SfmKit.Game.GameUi`) and the

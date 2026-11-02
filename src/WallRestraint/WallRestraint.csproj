@@ -4,7 +4,7 @@
   <PropertyGroup>
     <AssemblyName>WallRestraint</AssemblyName>
     <RootNamespace>WallRestraint</RootNamespace>
-    <Version>1.4.0</Version>
+    <Version>1.5.0</Version>
     <Description>WallRestraint - wall-mounted restraints for SecretFlasherManaka (BepInEx IL2CPP)</Description>
     <!-- Compiles against RestraintHub (build/SfmMod.targets); players install it separately. -->
     <SfmUsesRestraintHub>true</SfmUsesRestraintHub>

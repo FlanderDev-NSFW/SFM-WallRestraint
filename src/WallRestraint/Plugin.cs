@@ -11,12 +11,12 @@ using WallRestraint.Logic;
 namespace WallRestraint
 {
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-    [BepInDependency(Hub.Guid, "1.0.0")] // OnSave / OnLoad / OnNewGame
+    [BepInDependency(Hub.Guid, "^1.1.0")] // OnSave / OnLoad / OnNewGame; PutOn / CanPutOn / TakeOff / Settings (missions)
     public sealed class Plugin : BasePlugin
     {
         public const string PluginGuid = "FlanderDev.SFM.WallRestraint";
         public const string PluginName = "WallRestraint";
-        public const string PluginVersion = "1.4.0";
+        public const string PluginVersion = "1.5.0";
         private const string ModelResource = "WallRestraint.assets.wallrestraint.wrm";
 
         internal static ManualLogSource Logger;
@@ -90,6 +90,18 @@ namespace WallRestraint
                 Blocks = () => RestraintHub.Blocks.Moving | RestraintHub.Blocks.Running | RestraintHub.Blocks.Crouching | RestraintHub.Blocks.Pee
                                | RestraintHub.Blocks.HandActions | RestraintHub.Blocks.PoseSkills,
                 OnChosen = () => { var c = WallController.Instance; if (c != null) c.OnRingChosen(); },
+                PutOn = () => WallController.Instance == null ? "not ready" : WallController.Instance.PutOn(),
+                CanPutOn = WallController.Check,
+                TakeOff = () => WallController.Release(),
+                Settings = new[]
+                {
+                    new RestraintSetting
+                    {
+                        Name = "height", Unit = "cm (knees above the floor)",
+                        Get = () => WallController.Instance == null ? float.NaN : WallController.Instance.KneeHeight * 100f,
+                        Set = v => WallController.Instance == null ? "not ready" : WallController.Instance.SetKneeHeight(v / 100f, false),
+                    },
+                },
                 Attempt = () => WallController.Instance == null ? 0f : WallController.Instance.Machine.Attempt,
                 Controls = "+/- height",
             };

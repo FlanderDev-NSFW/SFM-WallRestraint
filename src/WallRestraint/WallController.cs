@@ -152,10 +152,29 @@ namespace WallRestraint
         [HideFromIl2Cpp]
         internal void OnRingChosen()
         {
-            string result = Lock(false);
-            if (_locked) GameUi.PlaySe(InGameSoundManager.SeType.CommonEquip);
-            else GameUi.Message("Can't use the wall restraint here: " + (result.StartsWith("refused: ") ? result.Substring(9).Split(" (")[0] : result));
+            string why = PutOn();
+            if (why != null) GameUi.Message("Can't use the wall restraint here: " + why);
         }
+
+        /// <summary>Lock her to the wall in front of her (the ring entry, or a mission through RestraintHub): null when it is
+        /// closing, else why not.</summary>
+        [HideFromIl2Cpp]
+        internal string PutOn()
+        {
+            string result = Lock(false);
+            if (!_locked) return Reason(result);
+            GameUi.PlaySe(InGameSoundManager.SeType.CommonEquip);
+            return null;
+        }
+
+        /// <summary>Whether <see cref="PutOn"/> would find a wall here (RestraintHub's CanPutOn): null = yes, else why not.</summary>
+        internal static string Check()
+        {
+            string result = Lock(false, true);
+            return result == "ok" ? null : Reason(result);
+        }
+
+        private static string Reason(string result) => result.StartsWith("refused: ") ? result.Substring(9).Split(" (")[0] : result;
 
         /// <summary>A save was loaded: she starts free (the wall may not be there); the number shortcuts come back.</summary>
         [HideFromIl2Cpp]
@@ -281,15 +300,16 @@ namespace WallRestraint
         /// <summary>Diagnostics: lock even where <see cref="LockHere"/> would refuse the wall (the reason is still reported).</summary>
         public static string LockForced() => Lock(true);
 
+        /// <summary>Lock her to the wall in front of her; <paramref name="check"/>: only find out whether it would work ("ok").</summary>
         [HideFromIl2Cpp]
-        private static string Lock(bool force)
+        private static string Lock(bool force, bool check = false)
         {
             try
             {
                 var c = Instance;
                 var player = PlayerController.Instance;
                 if (c == null || player == null || player.Pca == null || player.Pca.Animator == null) return "not in game";
-                if (c._locked) Release();
+                if (c._locked && !check) Release();
                 var anim = player.Pca.Animator;
                 if (!WallPoser.Measure(anim, out BodyDims body, out string problem)) return "refused: " + problem;
                 // Height: as high as the wall allows up to the preferred knee height (config, in shin lengths), down to kneeling.
@@ -307,8 +327,9 @@ namespace WallRestraint
                               + F(spot.KneeLow) + ".." + F(spot.KneeHigh) + ", kneeling " + F(kneeMin) + "), neck at " + F(layout.Neck.Z)
                               + " m; scales collar " + F(layout.CollarScale) + " rest " + F(layout.ArchScale) + " arm " + F(layout.ArmScale) + " leg " + F(layout.LegScale)
                               + (layout.Problem == null ? "" : "; layout problem: " + layout.Problem);
-                Plugin.Logger.LogInfo("[SFM-ACCEPT] lock: " + text + (spot.Map == null ? "" : Environment.NewLine + spot.Map));
+                Plugin.Logger.LogInfo("[SFM-ACCEPT] " + (check ? "check: " : "lock: ") + text + (spot.Map == null ? "" : Environment.NewLine + spot.Map));
                 if (!spot.Ok) return text;
+                if (check) return "ok";
                 if (c._rig == null || !c._rig.Built)
                 {
                     c._rig = new WallRig(Model);
@@ -394,28 +415,36 @@ namespace WallRestraint
             // + / - reach the wall restraint only while it is the selected restraint (the hub routes them, outside menus).
             int dir = Plugin.Entry.TakeStep();
             if (dir == 0 || !_locked || Machine.State != LockState.Locked) return;
-            float step = Plugin.StepCm.Value / 100f;
+            string why = SetKneeHeight(_params.KneeHeight + dir * Plugin.StepCm.Value / 100f, true);
+            if (why != null) GameUi.Message(why);
+        }
+
+        /// <summary>Her knees' height above the floor (m) while locked, else NaN (RestraintHub's setting "height", in cm).</summary>
+        internal float KneeHeight => _locked ? _params.KneeHeight : float.NaN;
+
+        /// <summary>Lift or lower her to knees at <paramref name="want"/> m (clamped to what the wall allowed at lock time): null
+        /// when done, else why not. <paramref name="fromKeys"/>: the player's + / -, remembered in the config; else a mission's.</summary>
+        [HideFromIl2Cpp]
+        internal string SetKneeHeight(float want, bool fromKeys)
+        {
+            if (!_locked || Machine.State != LockState.Locked) return "the wall restraint is not closed yet";
             float now = _params.KneeHeight;
-            float want = Math.Min(Math.Max(now + dir * step, _spot.KneeLow), _spot.KneeHigh);
+            int dir = Math.Sign(want - now);
+            want = Math.Min(Math.Max(want, _spot.KneeLow), _spot.KneeHigh);
             if (Math.Abs(want - now) < 1e-4f)
-            {
-                GameUi.Message(dir > 0 ? "The wall is not tall enough to lift her higher." : (want <= WallPose.MinKneeHeight(Model, _body, _params) + 1e-3f
-                    ? "She is kneeling - as low as it goes." : "The wall is not flat enough lower down."));
-                return;
-            }
+                return dir == 0 ? null : dir > 0 ? "The wall is not tall enough to lift her higher." : (want <= WallPose.MinKneeHeight(Model, _body, _params) + 1e-3f
+                    ? "She is kneeling - as low as it goes." : "The wall is not flat enough lower down.");
             var span = WallPose.Span(Model, _body, _params);
             var player = PlayerController.Instance;
             string blocked = player == null ? null : WallPlacer.InTheWay(_spot.Frame, (span.HalfWidth, want + span.Below, want + span.Above), _spot.ColliderPtr, player.transform);
-            if (blocked != null)
-            {
-                GameUi.Message("Something is in the way (" + blocked + ").");
-                return;
-            }
+            if (blocked != null) return "Something is in the way (" + blocked + ").";
             _params.KneeHeight = want;
             _layout = WallPose.Layout(Model, _body, _params);
             _rig.Place(_spot.Frame, _layout);
-            Plugin.KneeHeight.Value = want / _body.Shin; // remembered (saved to the config) for the next time
-            Plugin.Logger.LogInfo("[SFM-ACCEPT] height: knees at " + F(want) + " m (" + F(want / _body.Shin) + " shins; wall allows " + F(_spot.KneeLow) + ".." + F(_spot.KneeHigh) + ")");
+            if (fromKeys) Plugin.KneeHeight.Value = want / _body.Shin; // remembered (saved to the config) for the next time
+            Plugin.Logger.LogInfo("[SFM-ACCEPT] height: knees at " + F(want) + " m (" + F(want / _body.Shin) + " shins; wall allows " + F(_spot.KneeLow) + ".." + F(_spot.KneeHigh) + ")"
+                                  + (fromKeys ? "" : " (mission)"));
+            return null;
         }
 
         private void LateUpdate()
