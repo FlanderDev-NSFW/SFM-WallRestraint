@@ -1,4 +1,4 @@
-# WallRestraint 1.5.0
+# WallRestraint 2.0.0
 
 Wall restraints for **Secret Flasher Manaka**: she is locked against a wall, lifted off the floor. A collar holds her neck,
 a rest arches her back, cuffs hold her upper arms, and her shins go into tubes in the wall.
@@ -8,14 +8,15 @@ Model: ["Display Model - Wall Restraint"](https://smutba.se/project/0c0e09e3-921
 ## Requirements
 - Secret Flasher Manaka (tested with v1.1.3)
 - BepInEx 6 for IL2CPP (tested with build 738)
-- **RestraintHub 1.1.0** or newer
+- **RestraintHub 2.0.0** or newer (2.x)
 
 ## Install
 Extract the zip into the game folder (the folder with `SecretFlasherManaka.exe`). You get `BepInEx/plugins/WallRestraint/`.
 
 ## How to use
-Stand facing a flat wall, hold a ring key (e.g. `1`), page with `Z` / `X` to the restraint page and click **Wall Restraint**.
-If the wall does not fit (too far, bumpy, furniture in the way), a message says why. While locked:
+Stand facing a flat wall, open the restraint panel with `U` and click **Wall Restraint** (in Placeables): it is fitted to the
+wall. If the wall does not fit (too far, bumpy, furniture in the way), a message says why. Walk to it and press `F` to be locked
+in. It stays there (also in the save) until you pick it up in the panel ("Pick up: Wall Restraint"); one per map. While locked:
 
 | Key | Does |
 |---|---|
@@ -24,7 +25,7 @@ If the wall does not fit (too far, bumpy, furniture in the way), a message says 
 
 The camera starts behind her, inside the wall: turn it round to see her.
 
-Missions (Custom Missions v2) can put it on and lock it through RestraintHub: `RtHub_CanApply("WallRestraint")` tells whether there is a wall, `RtHub_Apply("WallRestraint")`, setting `height` (cm, her knees) - see [Missions.md](https://github.com/FlanderDev-NSFW/SFM-RestraintHub/blob/main/docs/Missions.md).
+Missions (Custom Missions v2) can put it on (at the wall in front of her) and lock it through RestraintHub: `RtHub_CanApply("WallRestraint")` tells whether there is a wall, `RtHub_Apply("WallRestraint")`, setting `height` (cm, her knees) - see [Missions.md](https://github.com/FlanderDev-NSFW/SFM-RestraintHub/blob/main/docs/Missions.md).
 
 ## Settings
 `BepInEx/config/FlanderDev.SFM.WallRestraint.cfg` (created on the first start). Most useful:
@@ -36,7 +37,7 @@ Missions (Custom Missions v2) can put it on and lock it through RestraintHub: `R
 | Unlock.SuccessChance | 1 | chance that struggling frees her (1 = first try) |
 
 ## Good to know
-- Being restrained is not saved: after loading she is free.
+- Being restrained is not saved: after loading she is free (a placed restraint stays).
 - Through glass walls the legs behind the wall can be seen.
 - Curtains can count as a wall.
 - After struggling free she faces away from the wall.

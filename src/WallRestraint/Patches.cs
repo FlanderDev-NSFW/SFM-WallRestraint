@@ -5,12 +5,10 @@ using RestraintHub;
 
 namespace WallRestraint
 {
-    /// <summary>Harmony hooks into the game: the load (she starts free). The ring entry, input blocking, unlock gauge and
-    /// number shortcuts are RestraintHub's. The load comes through RestraintHub (OnLoad).</summary>
+    /// <summary>The load (she starts free), through RestraintHub (OnLoad). The panel, placed restraints, input blocking and
+    /// unlock gauge are RestraintHub's.</summary>
     internal static class Patches
     {
-        public const string SaveKeyShortcuts = "WallRestraint.Shortcuts"; // written by the hub (kept from 1.1.0)
-
         // --- load: being restrained is not saved; a load always starts free (the wall may not be there) ----------------------
 
         internal static void Load(SaveSlot slot)

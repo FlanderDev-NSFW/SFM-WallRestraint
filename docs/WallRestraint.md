@@ -11,13 +11,19 @@ Wall-mounted restraints for SecretFlasherManaka (BepInEx 6 IL2CPP): she is held 
 collar, back arched over a rest, upper arms in cuffs beside it, knees bent with the shins going through leather-lined tubes into the
 wall. Single-player/offline only.
 
-**Needs RestraintHub** (1.0.0+, a separate download): ring entry, number shortcuts, the list of worn restraints, F and + / -
-routing, input blocking and conflicts are the hub's (`docs/mods/RestraintHub.md`). Refused while another restraint holds her
+**Needs RestraintHub** (2.0.0+, a separate download): a placeable (`WallRestraintFitting`: placed from the panel, kept per map
+and in the save by the hub, "F Wall Restraint" at it) whose in-use wearable is `WallRestraint` (the list of worn restraints, F
+and + / - routing, input blocking, conflicts, missions).
+
+**2.0.0 (RestraintHub 2):** placing probes the wall in front of her as locking did (`FindSpot`); the placed pose is the wall frame
+(on the floor at the surface, +Z out of the wall) and its data the chosen knee height and the range the wall allowed. F locks her
+there without probing again (the preferred height clamped into the saved range; the wall collider found again by a ray for the
+room check of + / -); the empty restraint is hidden while she is in it. Missions (`RtHub_Apply`) still use the wall in front of
+her. The ring entry and its shortcut save key are gone. Refused while another restraint holds her
 neck, arms or legs (the yoke, the spreader bar, the game's handcuffs).
 
-**Status 1.3.0:** usable. Face a flat wall (within `Reach`), pick **Wall Restraint** in the common ring (hold 1; the restraint page
-after the game's, page 5) or put it on a number key; hold **F** to struggle free (`Unlock.SuccessChance`, default: the first
-attempt). Refusals are shown in the game's message bar ("Can't use the wall restraint here: ..."). Being restrained is not saved:
+**Status 2.0.0:** usable. Face a flat wall (within `Reach`), place **Wall Restraint** from the hub's panel (`U`, Placeables), walk
+to it and press **F**; hold **F** to struggle free (`Unlock.SuccessChance`, default: the first attempt). Refusals are shown in the game's message bar ("Can't use the wall restraint here: ..."). Being restrained is not saved:
 a load starts free. While restrained, walking, running, crouching, peeing, pose skills and everything that needs her hands
 (masturbating, toys, the handcuffs, drinking, dropping items, clothes; 1.2.0: refused with a message) are ignored;
 the camera can still be turned (it starts behind her, inside the wall - turn it half round).
@@ -47,7 +53,7 @@ and fences work now: a 1.64 m concrete fence takes her with the knees at 0.8 m.
 ## Config (`BepInEx/config/FlanderDev.SFM.WallRestraint.cfg`)
 | Key | Default | Meaning |
 |---|---|---|
-| General.RingLabel | Wall Restraint | name of the ring entry |
+| General.RingLabel | Wall Restraint | name in the panel, at the placed restraint (F) and in the worn list (key name kept from 1.x) |
 | Unlock.AttemptSeconds | 4.5 | seconds of holding F per attempt |
 | Unlock.SuccessChance | 1 | chance an attempt frees her (failures add 0.02, like the game's handcuffs) |
 | Placement.Reach | 1.2 | how far in front of her a wall may be (m) |
@@ -105,9 +111,13 @@ and fences work now: a 1.64 m concrete fence takes her with the knees at 0.8 m.
   Neck 7 % of the spine + 0.4 cm: the collar sits around the neck, the choker just above it (front and three-quarter view). Arms
   9 % still about twice her arm, 7.5 %: the cuffs close around the upper arms, nothing through them. Lock accepted as before.
 - L3 1.1.0 (2026-11-02, with RestraintHub 1.1.0 and the test missions - details in RestraintHub's `docs/RestraintHub.md`, L3 1.1.0): `CanPutOn` (placement with `check`: "no wall in front of her" on the street, "the wall is not flat there" at the intercom, ok at the house wall), put on by a mission, setting `height` 75.6 -> 60 -> 500 clamped to 128.6 cm (the wall's top), config KneeHeight unchanged, taken off by the mission. `+` / `-` go through the same `SetKneeHeight`.
+- L3 2.0.0 (2026-11-07, RestraintHub 2.0.0 - details in its `docs/RestraintHub.md`, "L3 2.0.0 with the ported mods"): placed on a
+  street fence ("place: ok on 'Fence_Concrete_4m_01_LOD0'", the empty restraint on the fence, screenshot); F -> locked to the wall
+  there; V held -> free; kept through save + restart + load, used again after the load ("knees at 0.786 m ... wall allows
+  0.786..0.806" from the saved data); picked up from the panel. Not re-tested in 2.0: + / - on a placed one, missions.
 
-## Ring and lock code
-The ring entry, number shortcuts and the + / - and F routing are RestraintHub's (1.2.0); UI helpers (`SfmKit.Game.GameUi`) and the
+## Panel and lock code
+The panel, the placed restraints and the + / - and F routing are RestraintHub's (2.0); UI helpers (`SfmKit.Game.GameUi`) and the
 lock rules (`SfmKit.Pure.LockMachine`) are shared in `src/SfmKit`.
 
 ## Known limits / next

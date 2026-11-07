@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using ExposureUnnoticed2.Object3D.Player.Scripts;
@@ -9,6 +10,7 @@ using ExposureUnnoticed2.Scripts.Sound;
 using SfmKit.Game;
 using SfmKit.Pure;
 using UnityEngine;
+using RestraintHub;
 using WallRestraint.Logic;
 
 namespace WallRestraint
@@ -99,8 +101,8 @@ namespace WallRestraint
         private System.Numerics.Vector3 _viewFrom;
         private GameObject _viewLight;
 
-        // Lock state. The ring entry, number shortcuts, F / + / - routing and the input blocking are RestraintHub's (Plugin.Entry).
-        public const int RingItemValue = 9200; // SpreaderBar uses 9100
+        // Lock state. The panel, placed restraints ("F Wall Restraint"), F / + / - routing and the input blocking are
+        // RestraintHub's (Plugin.Entry, Plugin.Device).
         internal readonly LockMachine Machine = new LockMachine();
         private static int _failures;
 
@@ -148,20 +150,13 @@ namespace WallRestraint
             }
         }
 
-        /// <summary>The ring entry or a number key, when she is free and nothing worn holds the same parts (the hub checked).</summary>
-        [HideFromIl2Cpp]
-        internal void OnRingChosen()
-        {
-            string why = PutOn();
-            if (why != null) GameUi.Message("Can't use the wall restraint here: " + why);
-        }
-
-        /// <summary>Lock her to the wall in front of her (the ring entry, or a mission through RestraintHub): null when it is
-        /// closing, else why not.</summary>
+        /// <summary>Lock her to the wall: at the placed restraint whose "F" was pressed (RestraintHub sets Device.UsedAt), else to the
+        /// wall in front of her (a mission through RestraintHub). Null when it is closing, else why not.</summary>
         [HideFromIl2Cpp]
         internal string PutOn()
         {
-            string result = Lock(false);
+            var at = Plugin.Device.UsedAt;
+            string result = at != null ? Lock(false, false, at) : Lock(false);
             if (!_locked) return Reason(result);
             GameUi.PlaySe(InGameSoundManager.SeType.CommonEquip);
             return null;
@@ -176,7 +171,7 @@ namespace WallRestraint
 
         private static string Reason(string result) => result.StartsWith("refused: ") ? result.Substring(9).Split(" (")[0] : result;
 
-        /// <summary>A save was loaded: she starts free (the wall may not be there); the number shortcuts come back.</summary>
+        /// <summary>A save was loaded: she starts free (being on the wall is not saved; a placed one is the hub's).</summary>
         [HideFromIl2Cpp]
         internal void OnSaveLoaded()
         {
@@ -294,15 +289,16 @@ namespace WallRestraint
         private Quaternion _rootRot;
         private IntPtr _lockedPlayer;
 
-        /// <summary>Lock her to the wall in front of her (diagnostics until the ring menu entry exists).</summary>
+        /// <summary>Diagnostics: lock her to the wall in front of her.</summary>
         public static string LockHere() => Lock(false);
 
         /// <summary>Diagnostics: lock even where <see cref="LockHere"/> would refuse the wall (the reason is still reported).</summary>
         public static string LockForced() => Lock(true);
 
-        /// <summary>Lock her to the wall in front of her; <paramref name="check"/>: only find out whether it would work ("ok").</summary>
+        /// <summary>Lock her to the wall in front of her, or at the placed restraint <paramref name="at"/>; <paramref name="check"/>:
+        /// only find out whether it would work ("ok").</summary>
         [HideFromIl2Cpp]
-        private static string Lock(bool force, bool check = false)
+        private static string Lock(bool force, bool check = false, Placed at = null)
         {
             try
             {
@@ -317,7 +313,9 @@ namespace WallRestraint
                 float kneeMin = WallPose.MinKneeHeight(Model, body, prm);
                 float kneeMax = Math.Max(kneeMin, MaxKneeShins * body.Shin);
                 float preferred = Math.Min(Math.Max(Plugin.KneeHeight.Value * body.Shin, kneeMin), kneeMax);
-                var spot = WallPlacer.Find(player, WallPose.Span(Model, body, prm), kneeMin, kneeMax, preferred, Plugin.Reach.Value, force);
+                // A placed restraint was probed when it was placed: its wall frame and the heights it allows were kept.
+                var spot = at != null ? SpotOf(at, preferred, player.transform)
+                                      : WallPlacer.Find(player, WallPose.Span(Model, body, prm), kneeMin, kneeMax, preferred, Plugin.Reach.Value, force);
                 c._spot = spot;
                 prm.KneeHeight = spot.Knee;
                 var layout = WallPose.Layout(Model, body, prm);
@@ -340,6 +338,8 @@ namespace WallRestraint
                 c._params = prm;
                 c._rig.Place(spot.Frame, layout);
                 c._rig.SetVisible(true);
+                c._inPlaced = at;
+                if (at != null && c._placed.TryGetValue(at, out var empty)) empty.SetVisible(false); // the fitted rig takes its place
                 // Her root stands on the floor under her hips, facing out of the wall (the camera and the game follow it).
                 c._rootAt = WallPlacer.U(spot.Frame.Point(new System.Numerics.Vector3(layout.Hips.X + 0.1f, 0f, 0f)));
                 c._rootRot = Quaternion.LookRotation(WallPlacer.U(spot.Frame.Normal), Vector3.up);
@@ -388,8 +388,105 @@ namespace WallRestraint
             WallPoser.ForgetDrawn();
             c.Machine.Reset();
             c._rig?.SetVisible(false);
+            if (c._inPlaced != null && c._placed.TryGetValue(c._inPlaced, out var empty)) empty.SetVisible(true);
+            c._inPlaced = null;
             Plugin.Logger.LogInfo("[SFM-ACCEPT] release: unlocked");
             return "released";
+        }
+
+        // --- the restraint as a placeable (RestraintHub keeps the placed ones, their map and the save) -------------------------
+
+        private readonly Dictionary<Placed, WallRig> _placed = new Dictionary<Placed, WallRig>();
+        private Placed _inPlaced;
+
+        /// <summary>The panel's "Wall Restraint": the wall in front of her, probed as for locking. Its pose is the wall frame (on
+        /// the floor at the wall's surface, +Z out of the wall); its data the knee height chosen and the range the wall allows.</summary>
+        internal static PlaceSpot FindSpot()
+        {
+            var player = PlayerController.Instance;
+            if (Instance == null || player == null || player.Pca == null || player.Pca.Animator == null) return PlaceSpot.No("not ready");
+            var anim = player.Pca.Animator;
+            if (!WallPoser.Measure(anim, out BodyDims body, out string problem)) return PlaceSpot.No(problem);
+            var prm = Params();
+            float kneeMin = WallPose.MinKneeHeight(Model, body, prm);
+            float kneeMax = Math.Max(kneeMin, MaxKneeShins * body.Shin);
+            float preferred = Math.Min(Math.Max(Plugin.KneeHeight.Value * body.Shin, kneeMin), kneeMax);
+            var spot = WallPlacer.Find(player, WallPose.Span(Model, body, prm), kneeMin, kneeMax, preferred, Plugin.Reach.Value);
+            Plugin.Logger.LogInfo("[SFM-ACCEPT] place: " + Describe(spot));
+            if (!spot.Ok) return PlaceSpot.No(spot.Reason);
+            prm.KneeHeight = spot.Knee;
+            var layout = WallPose.Layout(Model, body, prm);
+            if (layout.Problem != null) return PlaceSpot.No(layout.Problem);
+            var f = spot.Frame;
+            return new PlaceSpot
+            {
+                Position = WallPlacer.U(f.Origin),
+                Rotation = Quaternion.LookRotation(WallPlacer.U(f.Normal), WallPlacer.U(f.Up)),
+                Data = F(spot.Knee) + " " + F(spot.KneeLow) + " " + F(spot.KneeHigh),
+            };
+        }
+
+        /// <summary>A placed restraint shown (placed, or its map loaded): the restraint on the wall, sized for her, empty.</summary>
+        internal static void ShowPlaced(Placed placed)
+        {
+            var c = Instance;
+            var anim = PlayerController.Instance?.Pca?.Animator;
+            if (c == null || anim == null) return;
+            if (!WallPoser.Measure(anim, out BodyDims body, out string problem))
+            {
+                Plugin.Logger.LogWarning("placed wall restraint not shown: " + problem);
+                return;
+            }
+            var prm = Params();
+            prm.KneeHeight = Heights(placed).Knee;
+            var rig = new WallRig(Model);
+            rig.Build(anim.gameObject.layer, placed.Root);
+            rig.Place(FrameOf(placed), WallPose.Layout(Model, body, prm));
+            rig.SetVisible(true);
+            c._placed[placed] = rig;
+        }
+
+        internal static void HidePlaced(Placed placed)
+        {
+            var c = Instance;
+            if (c == null || !c._placed.TryGetValue(placed, out var rig)) return;
+            rig.Destroy();
+            c._placed.Remove(placed);
+        }
+
+        private static WallFrame FrameOf(Placed p) =>
+            new WallFrame(WallPlacer.N(p.Position), WallPlacer.N(p.Rotation * Vector3.forward), WallPlacer.N(p.Rotation * Vector3.up), 1f);
+
+        /// <summary>The knee height chosen when it was placed and the range the wall allows (m), from its data.</summary>
+        private static (float Knee, float Low, float High) Heights(Placed p)
+        {
+            var parts = (p.Data ?? "").Split(' ');
+            float Get(int i, float fallback) =>
+                i < parts.Length && float.TryParse(parts[i], NumberStyles.Float, CultureInfo.InvariantCulture, out float v) && !float.IsNaN(v) ? v : fallback;
+            float knee = Get(0, 0.4f);
+            return (knee, Math.Min(Get(1, knee), knee), Math.Max(Get(2, knee), knee));
+        }
+
+        /// <summary>The lock spot of a placed restraint: its wall frame and heights, the preferred knee height within them; the
+        /// wall's collider found again (for the room check of + / -).</summary>
+        private static WallPlacer.Spot SpotOf(Placed p, float preferred, Transform player)
+        {
+            var h = Heights(p);
+            var frame = FrameOf(p);
+            var spot = new WallPlacer.Spot
+            {
+                Ok = true, Frame = frame, KneeLow = h.Low, KneeHigh = h.High,
+                Knee = Math.Min(Math.Max(preferred, h.Low), h.High),
+                Collider = "placed",
+            };
+            Vector3 n = WallPlacer.U(frame.Normal);
+            Vector3 from = WallPlacer.U(frame.Origin) + n * 0.5f + Vector3.up * 1.0f;
+            if (WallSurvey.Cast(from, -n, 1.0f, player, out RaycastHit hit))
+            {
+                spot.Collider = hit.collider.name;
+                spot.ColliderPtr = hit.collider.Pointer;
+            }
+            return spot;
         }
 
         [HideFromIl2Cpp]

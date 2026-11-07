@@ -11,17 +11,19 @@ using WallRestraint.Logic;
 namespace WallRestraint
 {
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
-    [BepInDependency(Hub.Guid, "^1.1.0")] // OnSave / OnLoad / OnNewGame; PutOn / CanPutOn / TakeOff / Settings (missions)
+    [BepInDependency(Hub.Guid, "^2.0.0")] // RestraintHub 2: a placeable (the panel, U; F at it), PutOn / TakeOff and height for missions
     public sealed class Plugin : BasePlugin
     {
         public const string PluginGuid = "FlanderDev.SFM.WallRestraint";
         public const string PluginName = "WallRestraint";
-        public const string PluginVersion = "1.5.0";
+        public const string PluginVersion = "2.0.0";
         private const string ModelResource = "WallRestraint.assets.wallrestraint.wrm";
 
         internal static ManualLogSource Logger;
-        /// <summary>The wall restraint's registration with RestraintHub (ring entry, selection, F and + / -).</summary>
-        internal static Restraint Entry;
+        /// <summary>Being on the wall, registered with RestraintHub (worn list, selection, F, + / -; missions' <c>RtHub_Apply("WallRestraint")</c>).</summary>
+        internal static Wearable Entry;
+        /// <summary>The restraint as a placeable: placed on a wall from the hub's panel, F at it puts her on (<see cref="Entry"/>).</summary>
+        internal static Placeable Device;
         public static ConfigEntry<float> Reach, MetalShade, KneeHeight, StepCm, ThighLean, ArchBulge, TubeClearanceCm, ClearanceCm, KneeOutside, TubeLift;
         public static ConfigEntry<int> DebugDisable;
         public static ConfigEntry<string> RingLabel;
@@ -30,7 +32,7 @@ namespace WallRestraint
         public override void Load()
         {
             Logger = Log;
-            RingLabel = Config.Bind("General", "RingLabel", "Wall Restraint", "Name of the ring menu entry.");
+            RingLabel = Config.Bind("General", "RingLabel", "Wall Restraint", "Name in the restraint panel, at the placed restraint (F) and in the worn list.");
             AttemptSeconds = Config.Bind("Unlock", "AttemptSeconds", 4.5f, new ConfigDescription(
                 "Seconds of holding the interact key (F) per attempt to struggle free.", new AcceptableValueRange<float>(0.5f, 30f)));
             SuccessChance = Config.Bind("Unlock", "SuccessChance", 1f, new ConfigDescription(
@@ -76,12 +78,10 @@ namespace WallRestraint
             }
             ClassInjector.RegisterTypeInIl2Cpp<WallController>();
             AddComponent<WallController>();
-            Entry = new Restraint
+            Entry = new Wearable
             {
                 Id = "WallRestraint",
-                RingValue = WallController.RingItemValue,
                 Label = () => RingLabel.Value,
-                ShortcutSaveKey = Patches.SaveKeyShortcuts,
                 OnLoad = Patches.Load,
                 OnNewGame = () => WallController.Instance?.OnNewGame(),
                 Holds = BodyParts.Neck | BodyParts.Arms | BodyParts.Legs | BodyParts.Spot,
@@ -89,7 +89,6 @@ namespace WallRestraint
                 // Held on the wall: no walking, running, crouching, peeing, pose skills or anything that needs her hands.
                 Blocks = () => RestraintHub.Blocks.Moving | RestraintHub.Blocks.Running | RestraintHub.Blocks.Crouching | RestraintHub.Blocks.Pee
                                | RestraintHub.Blocks.HandActions | RestraintHub.Blocks.PoseSkills,
-                OnChosen = () => { var c = WallController.Instance; if (c != null) c.OnRingChosen(); },
                 PutOn = () => WallController.Instance == null ? "not ready" : WallController.Instance.PutOn(),
                 CanPutOn = WallController.Check,
                 TakeOff = () => WallController.Release(),
@@ -105,7 +104,18 @@ namespace WallRestraint
                 Attempt = () => WallController.Instance == null ? 0f : WallController.Instance.Machine.Attempt,
                 Controls = "+/- height",
             };
-            Hub.Register(Entry);
+            Device = new Placeable
+            {
+                Id = "WallRestraintFitting",
+                Label = () => RingLabel.Value,
+                FindSpot = WallController.FindSpot,
+                Show = WallController.ShowPlaced,
+                Hide = WallController.HidePlaced,
+                AreaCenter = new UnityEngine.Vector3(0f, 0f, 0.4f), // where she stands, in front of the wall
+                AreaRadius = 0.45f,
+                InUse = Entry, // F at a placed one: PutOn reads Device.UsedAt
+            };
+            Hub.Register(Device);
             Logger.LogInfo("[SFM-ACCEPT] load: " + PluginName + " " + PluginVersion + " ready (" + WallController.Model.Parts.Count + " parts)");
         }
 

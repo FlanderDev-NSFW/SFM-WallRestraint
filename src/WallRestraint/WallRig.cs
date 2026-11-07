@@ -32,11 +32,14 @@ namespace WallRestraint
             _ => _model.Legs[side].Mouth,
         };
 
-        public void Build(int layer)
+        /// <summary>Make the restraint's objects: under <paramref name="parent"/> (a placed one: goes with its map), else on its own
+        /// across maps.</summary>
+        public void Build(int layer, Transform parent = null)
         {
             Destroy();
             _root = new GameObject("WallRestraint");
-            UnityEngine.Object.DontDestroyOnLoad(_root);
+            if (parent != null) _root.transform.SetParent(parent, false);
+            else UnityEngine.Object.DontDestroyOnLoad(_root);
             _root.layer = layer;
             Material source = FindHandcuffMaterial();
             foreach (var part in _model.Parts)
