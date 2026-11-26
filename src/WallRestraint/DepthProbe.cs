@@ -75,16 +75,31 @@ namespace WallRestraint
         }
 
         /// <summary>
-        /// <see cref="Sample"/> with the player's renderers switched off for the render (her renderers are on several layers,
-        /// possibly ones the walls use too, so a layer mask cannot hide her).
+        /// <see cref="Sample"/> with only the map drawn. Switched off for the render are the player's renderers and every renderer
+        /// in the DontDestroyOnLoad scene: her renderers are on several layers, possibly ones the walls use too, so a layer mask
+        /// cannot hide her. Worn mod items (ShockCollar, Harness, jewellery) are drawn under their own scene roots there and were
+        /// measured as part of the wall: a 13.8 cm bump with ShockCollar on, 30.4 cm with Harness, ok without (L3 2026-11-26,
+        /// Residence, BG_House_04_Collider at (-24.65, -118.00)). The walls are in the stage's scene, and so are placed objects
+        /// (the hub moves them there).
         /// </summary>
         public static float[] SampleWithout(Transform player, Vector3 center, Vector3 normal, Vector3 up, float width, float height, int w, int h)
         {
-            var renderers = player.GetComponentsInChildren<Renderer>(false);
-            var was = new bool[renderers.Length];
+            var renderers = new System.Collections.Generic.List<Renderer>();
+            var seen = new System.Collections.Generic.HashSet<IntPtr>();
+            void Add(GameObject root)
+            {
+                foreach (var r in root.GetComponentsInChildren<Renderer>(false))
+                    if (r != null && seen.Add(r.Pointer)) renderers.Add(r);
+            }
+            Add(player.gameObject);
+            var scene = player.gameObject.scene;
+            if (scene.IsValid() && scene.name == "DontDestroyOnLoad")
+                foreach (var root in scene.GetRootGameObjects())
+                    if (root != null && root.activeInHierarchy) Add(root);
+            var was = new bool[renderers.Count];
             try
             {
-                for (int i = 0; i < renderers.Length; i++)
+                for (int i = 0; i < renderers.Count; i++)
                 {
                     was[i] = renderers[i].forceRenderingOff;
                     renderers[i].forceRenderingOff = true;
@@ -93,7 +108,7 @@ namespace WallRestraint
             }
             finally
             {
-                for (int i = 0; i < renderers.Length; i++)
+                for (int i = 0; i < renderers.Count; i++)
                     if (renderers[i] != null) renderers[i].forceRenderingOff = was[i];
             }
         }

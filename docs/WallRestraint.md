@@ -22,6 +22,10 @@ room check of + / -); the empty restraint is hidden while she is in it. Missions
 her. The ring entry and its shortcut save key are gone. Refused while another restraint holds her
 neck, arms or legs (the yoke, the spreader bar, the game's handcuffs).
 
+**2.0.1:** the wall probe draws only the map. Worn items of other mods (ShockCollar, Harness, jewellery) are drawn under their own
+roots in the DontDestroyOnLoad scene, outside her hierarchy, and were measured as part of the wall: every wall was refused as "not flat"
+while one was worn (`DepthProbe.SampleWithout` now hides that whole scene; placed objects are in the stage's scene and still count).
+
 **Status 2.0.0:** usable. Face a flat wall (within `Reach`), place **Wall Restraint** from the hub's panel (`U`, Placeables), walk
 to it and press **F**; hold **F** to struggle free (`Unlock.SuccessChance`, default: the first attempt). Refusals are shown in the game's message bar ("Can't use the wall restraint here: ..."). Being restrained is not saved:
 a load starts free. While restrained, walking, running, crouching, peeing, pose skills and everything that needs her hands

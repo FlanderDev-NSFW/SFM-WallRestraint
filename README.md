@@ -1,4 +1,4 @@
-# WallRestraint 2.0.0
+# WallRestraint 2.0.1
 
 Wall restraints for **Secret Flasher Manaka**: she is locked against a wall, lifted off the floor. A collar holds her neck,
 a rest arches her back, cuffs hold her upper arms, and her shins go into tubes in the wall.

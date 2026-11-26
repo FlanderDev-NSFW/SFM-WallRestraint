@@ -16,7 +16,7 @@ namespace WallRestraint
     {
         public const string PluginGuid = "FlanderDev.SFM.WallRestraint";
         public const string PluginName = "WallRestraint";
-        public const string PluginVersion = "2.0.0";
+        public const string PluginVersion = "2.0.1";
         private const string ModelResource = "WallRestraint.assets.wallrestraint.wrm";
 
         internal static ManualLogSource Logger;
